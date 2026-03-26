@@ -1,0 +1,814 @@
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { 
+  Bell, 
+  Users, 
+  Settings as SettingsIcon, 
+  Home, 
+  ChevronRight, 
+  Zap, 
+  ArrowRight,
+  RotateCcw
+} from 'lucide-react';
+import { GameType, GameRoom, LadyCard, PokerCard } from './types';
+import { ROOMS } from './constants';
+import { loungeApi } from './lib/api';
+
+// --- Components ---
+
+const TopAppBar = ({ credits, onBack }: { credits: number, onBack?: () => void }) => (
+  <header className="bg-surface sticky top-0 z-50 w-full px-6 py-4 pt-10 border-b border-surface-container-high">
+    <div className="flex justify-between items-center max-w-5xl mx-auto">
+      <div className="flex items-center gap-3">
+        <button 
+          onClick={onBack}
+          className="w-10 h-10 rounded-full bg-surface-container-high flex items-center justify-center overflow-hidden hover:bg-surface-container-highest transition-colors"
+        >
+          <img 
+            src="https://lh3.googleusercontent.com/aida-public/AB6AXuAMqmqnUfUeXom0Ep6ofgn-fW0sGy0RhMtWaXkNaYfhzxAs9_IJfPtmR-zsKP9bMuSZNGvBXfMiYZuIDtrlgk6bWoxB4mgeajFyekKwLT1rkGelXSPsPdcjf8vNHn9x1jtC4qxv28OcCY1AVMJEiuXW5tqJ1HeTQN-jJwbESdFr385Uko6vVi4_xiiC7mXkQyR-jPbiZOwPyRjMGPFgkf69ICgmAvcXn_NdF38mlPW9Z2xe_V5kr7rseXCWAK2pOZD4CtO2GyAu4q3q" 
+            alt="Profile" 
+            className="w-full h-full object-cover"
+          />
+        </button>
+        <h1 className="font-headline font-bold tracking-tight text-2xl text-on-surface">The Lounge</h1>
+      </div>
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-surface-container-low">
+          <span className="material-symbols-outlined text-sm text-secondary">database</span>
+          <span className="font-headline font-bold text-on-surface text-sm">{credits.toLocaleString()} Credits</span>
+        </div>
+        <button className="p-2 text-outline hover:text-on-surface transition-colors">
+          <Bell size={20} />
+        </button>
+      </div>
+    </div>
+  </header>
+);
+
+const BottomNav = ({ activeTab, onTabChange }: { activeTab: string, onTabChange: (tab: string) => void }) => (
+  <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-8 pt-4 bg-white/80 backdrop-blur-xl border-t border-surface-container-high">
+    {[
+      { id: 'home', icon: Home, label: 'Home' },
+      { id: 'social', icon: Users, label: 'Social' },
+      { id: 'settings', icon: SettingsIcon, label: 'Settings' },
+    ].map((tab) => (
+      <button
+        key={tab.id}
+        onClick={() => onTabChange(tab.id)}
+        className={`flex flex-col items-center justify-center px-6 py-2 rounded-xl transition-all duration-200 ${
+          activeTab === tab.id 
+            ? 'bg-surface-container-high text-on-surface scale-105' 
+            : 'text-outline hover:text-on-surface'
+        }`}
+      >
+        <tab.icon size={20} strokeWidth={activeTab === tab.id ? 2.5 : 2} />
+        <span className="font-body text-[10px] font-medium mt-1 uppercase tracking-wider">{tab.label}</span>
+      </button>
+    ))}
+  </nav>
+);
+
+// --- Views ---
+
+const LobbyView = ({ onSelectGame, rooms, isLoading }: { onSelectGame: (type: GameType) => void; rooms: GameRoom[]; isLoading: boolean }) => {
+  const diceRoom = rooms.find((room) => room.type === 'DICE');
+  const pokerRooms = rooms.filter((room) => room.type === 'POKER');
+  const pokerPlayers = pokerRooms.reduce((sum, room) => sum + room.players, 0);
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      className="max-w-5xl mx-auto px-6 pt-12 pb-32"
+    >
+      <section className="mb-12">
+        <h2 className="font-headline text-5xl font-extrabold tracking-tighter mb-4 text-on-surface leading-[1.1]">
+          Choose your <br/><span className="text-secondary">vibe tonight.</span>
+        </h2>
+        <p className="font-body text-on-surface-variant max-w-md leading-relaxed">
+          High-end social experiences curated for the modern minimalist. Select a game to begin your session.
+        </p>
+      </section>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Featured: Lady Cards */}
+        <div className="md:col-span-2 group relative bg-surface-container-lowest rounded-2xl p-8 flex flex-col justify-between min-h-[420px] hover:bg-surface-container-low transition-all duration-300 editorial-shadow border border-surface-container-high">
+          <div className="flex justify-between items-start">
+            <div>
+              <span className="text-[10px] font-bold tracking-[0.2em] text-outline uppercase mb-2 block">Social Classic</span>
+              <h3 className="font-headline text-3xl font-bold">Lady Cards</h3>
+              <p className="text-on-surface-variant mt-1 font-medium">小姐牌</p>
+            </div>
+            <div className="w-12 h-12 rounded-full border border-surface-container-high flex items-center justify-center group-hover:bg-primary group-hover:text-on-primary transition-colors">
+              <span className="material-symbols-outlined text-2xl">playing_cards</span>
+            </div>
+          </div>
+          <div className="flex-1 flex items-center justify-center py-8">
+            <div className="relative w-40 h-56 bg-surface-container-low rounded-xl flex items-center justify-center border border-surface-container-high shadow-sm">
+              <span className="material-symbols-outlined text-7xl text-secondary/20">style</span>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="font-headline text-5xl font-extrabold text-primary/30">Q</span>
+              </div>
+            </div>
+          </div>
+          <button 
+            onClick={() => onSelectGame('LADY_CARDS')}
+            className="w-full py-4 bg-primary text-on-primary rounded-xl font-bold font-headline tracking-wide hover:opacity-90 transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
+          >
+            Join Table
+            <ArrowRight size={18} />
+          </button>
+        </div>
+
+        {/* Side Column */}
+        <div className="flex flex-col gap-6">
+          {/* Dice Game */}
+          <div 
+            onClick={() => onSelectGame('DICE')}
+            className="group cursor-pointer bg-surface-container-lowest rounded-2xl p-6 flex flex-col justify-between min-h-[200px] hover:bg-surface-container-low transition-all border border-surface-container-high"
+          >
+            <div className="flex justify-between items-start">
+              <div className="w-10 h-10 rounded-xl bg-secondary-container/30 flex items-center justify-center">
+                <span className="material-symbols-outlined text-secondary">casino</span>
+              </div>
+              <ChevronRight className="text-outline group-hover:text-primary transition-colors" size={20} />
+            </div>
+            <div>
+              <h3 className="font-headline text-2xl font-bold">Dice Game</h3>
+              <p className="text-on-surface-variant text-sm font-medium">摇骰子</p>
+            </div>
+            <div className="mt-4 flex items-center gap-3">
+              <div className="h-1 flex-1 bg-surface-container-high rounded-full overflow-hidden">
+                <div className="h-full bg-secondary w-2/3"></div>
+              </div>
+              <span className="text-[10px] font-bold text-outline tracking-widest">
+                {isLoading ? '...' : `${diceRoom?.players ?? 0} ACTIVE`}
+              </span>
+            </div>
+          </div>
+
+          {/* Poker */}
+          <div 
+            onClick={() => onSelectGame('POKER')}
+            className="group cursor-pointer bg-surface-container-lowest rounded-2xl p-6 flex flex-col justify-between min-h-[200px] hover:bg-surface-container-low transition-all border border-surface-container-high"
+          >
+            <div className="flex justify-between items-start">
+              <div className="w-10 h-10 rounded-xl bg-surface-container-high flex items-center justify-center">
+                <span className="material-symbols-outlined text-primary">style</span>
+              </div>
+              <ChevronRight className="text-outline group-hover:text-primary transition-colors" size={20} />
+            </div>
+            <div>
+              <h3 className="font-headline text-2xl font-bold">Texas Hold'em</h3>
+              <p className="text-on-surface-variant text-sm font-medium">德州扑克</p>
+            </div>
+            <div className="mt-4">
+              <div className="flex -space-x-2">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="w-6 h-6 rounded-full border-2 border-white bg-surface-container-high overflow-hidden">
+                    <img src={`https://picsum.photos/seed/p${i}/40/40`} alt="Player" className="w-full h-full object-cover" />
+                  </div>
+                ))}
+                <div className="w-6 h-6 rounded-full bg-surface-container-high border-2 border-white flex items-center justify-center text-[8px] font-bold text-outline">
+                  {isLoading ? '...' : `+${Math.max(pokerPlayers - 3, 0)}`}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <section className="mt-16 bg-surface-container-low rounded-3xl p-10 flex flex-col md:flex-row items-center justify-between gap-8">
+        <div className="md:w-1/2">
+          <h4 className="font-headline text-2xl font-bold mb-3">Feeling adventurous?</h4>
+          <p className="text-on-surface-variant text-sm leading-relaxed font-medium">
+            The Lounge curates a unique selection of minimal social games designed for quiet nights and high-stakes conversations.
+          </p>
+        </div>
+        <button className="px-10 py-4 bg-white text-on-surface rounded-xl font-bold text-sm shadow-sm hover:shadow-md transition-all border border-surface-container-high active:scale-95">
+          Explore More Games
+        </button>
+      </section>
+    </motion.div>
+  );
+};
+
+const DiceGameView = () => {
+  const [diceCount, setDiceCount] = useState(5);
+  const [results, setResults] = useState<number[]>([]);
+  const [isShaking, setIsShaking] = useState(false);
+  const [isRevealed, setIsRevealed] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const [isPeeking, setIsPeeking] = useState(false);
+
+  const handleShake = async () => {
+    setIsShaking(true);
+    setIsRevealed(false);
+    setErrorMessage('');
+
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      const result = await loungeApi.rollDice(diceCount, 'Guest');
+      setResults(result.results);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to roll dice.';
+      setErrorMessage(message);
+      setResults(Array.from({ length: diceCount }, () => 1));
+    } finally {
+      setIsShaking(false);
+    }
+  };
+
+  // Only initialize results when count changes, but don't "shake" automatically
+  useEffect(() => {
+    setResults(Array.from({ length: diceCount }, () => 1));
+    setIsRevealed(false);
+  }, [diceCount]);
+
+  const showDice = isRevealed || isPeeking;
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="max-w-5xl mx-auto px-6 pt-8 pb-32"
+    >
+      <section className="mb-8 text-center">
+        <h1 className="font-headline text-5xl font-extrabold tracking-tighter text-on-surface mb-2">摇骰子</h1>
+        <p className="font-body text-on-surface-variant max-w-md mx-auto leading-relaxed font-medium">
+          Select dice count and shake. Use "Peek" to check your results.
+        </p>
+      </section>
+
+      <div className="flex flex-col gap-8">
+        {/* Dice Selection - Horizontal Scroll on Mobile */}
+        <div className="bg-surface-container-low rounded-3xl p-6 border border-surface-container-high">
+          <h3 className="font-headline text-sm font-bold uppercase tracking-widest text-outline mb-4 text-center">How many dice?</h3>
+          <div className="flex overflow-x-auto pb-2 gap-2 no-scrollbar justify-center sm:justify-center">
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
+              <button 
+                key={n}
+                onClick={() => setDiceCount(n)}
+                className={`flex-shrink-0 w-12 h-12 rounded-xl border font-bold transition-all ${
+                  diceCount === n 
+                    ? 'bg-primary border-primary text-on-primary scale-110 shadow-lg' 
+                    : 'bg-white border-surface-container-high hover:bg-surface-container-low'
+                }`}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Main Dice Display Area */}
+        <div className="bg-white rounded-[2.5rem] p-8 flex flex-col items-center justify-center min-h-[400px] relative overflow-hidden editorial-shadow border border-surface-container-high">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(var(--color-primary-rgb),0.03),transparent)] pointer-events-none"></div>
+          
+          <div className="flex flex-wrap justify-center items-center gap-4 z-10 max-w-2xl">
+            <AnimatePresence mode="popLayout">
+              {results.map((val, idx) => (
+                <motion.div 
+                  key={`${idx}-${val}`}
+                  initial={{ scale: 0.8, opacity: 0, rotateY: 90 }}
+                  animate={{ 
+                    scale: 1, 
+                    opacity: 1, 
+                    rotateY: showDice ? 0 : 180,
+                    x: isShaking ? [0, -15, 15, -15, 15, 0] : 0,
+                    y: isShaking ? [0, 15, -15, 15, -15, 0] : 0
+                  }}
+                  transition={{ 
+                    duration: isShaking ? 0.1 : 0.4, 
+                    repeat: isShaking ? 5 : 0,
+                    delay: idx * 0.05 
+                  }}
+                  className="w-16 h-16 sm:w-20 sm:h-20 bg-surface-container-lowest rounded-2xl flex items-center justify-center shadow-xl border border-surface-container-high relative preserve-3d"
+                >
+                  {/* Front (Value) */}
+                  <div className={`absolute inset-0 flex items-center justify-center backface-hidden ${showDice ? 'opacity-100' : 'opacity-0'}`}>
+                    <span className="material-symbols-outlined text-4xl sm:text-5xl text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>
+                      {`filter_${val}`}
+                    </span>
+                  </div>
+                  {/* Back (Hidden) */}
+                  <div className={`absolute inset-0 flex items-center justify-center bg-primary rounded-2xl backface-hidden rotate-y-180 ${showDice ? 'opacity-0' : 'opacity-100'}`}>
+                    <span className="material-symbols-outlined text-2xl sm:text-3xl text-on-primary">question_mark</span>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+
+          <div className="absolute bottom-6 left-0 right-0 flex flex-col items-center gap-2">
+            <div className="bg-secondary-container/40 backdrop-blur-xl px-4 py-1.5 rounded-full flex items-center gap-2 border border-white/20">
+              <div className={`w-1.5 h-1.5 rounded-full ${showDice ? 'bg-error' : 'bg-primary'} animate-pulse`}></div>
+              <span className="text-[9px] font-bold text-on-secondary-container tracking-widest uppercase">
+                {showDice ? 'Visible' : 'Hidden'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {errorMessage && (
+          <p className="text-center text-sm text-error font-medium">{errorMessage}</p>
+        )}
+
+        {/* Primary Controls */}
+        <div className="grid grid-cols-2 gap-4">
+          <button 
+            onClick={handleShake}
+            disabled={isShaking}
+            className="flex flex-col items-center justify-center py-6 bg-primary text-on-primary rounded-[2rem] shadow-2xl active:scale-95 transition-all disabled:opacity-50"
+          >
+            <Zap size={24} className={`mb-2 ${isShaking ? 'animate-pulse' : ''}`} />
+            <span className="font-headline font-bold text-sm uppercase tracking-widest">Shake Cup</span>
+          </button>
+          
+          <div className="grid grid-rows-2 gap-2">
+            <button 
+              onMouseDown={() => setIsPeeking(true)}
+              onMouseUp={() => setIsPeeking(false)}
+              onMouseLeave={() => setIsPeeking(false)}
+              onTouchStart={() => setIsPeeking(true)}
+              onTouchEnd={() => setIsPeeking(false)}
+              className="flex items-center justify-center bg-surface-container-high text-on-surface-variant rounded-2xl font-headline font-bold text-xs uppercase tracking-widest active:bg-primary active:text-on-primary transition-all"
+            >
+              Hold to Peek
+            </button>
+            <button 
+              onClick={() => setIsRevealed(!isRevealed)}
+              className={`flex items-center justify-center rounded-2xl font-headline font-bold text-xs uppercase tracking-widest transition-all ${
+                isRevealed ? 'bg-error text-on-error' : 'bg-surface-container-low text-on-surface-variant'
+              }`}
+            >
+              {isRevealed ? 'Hide Dice' : 'Reveal All'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+const PokerGameView = () => {
+  const [roomCode, setRoomCode] = useState('');
+  const [isJoined, setIsJoined] = useState(false);
+  const [communityCards, setCommunityCards] = useState<PokerCard[]>([]);
+  const [revealStage, setRevealStage] = useState(0); // 0: Pre-flop, 1: Flop, 2: Turn, 3: River
+  const [playerCards, setPlayerCards] = useState<PokerCard[]>([]);
+  const [handId, setHandId] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const handleJoin = async () => {
+    if (roomCode.length !== 4) {
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setErrorMessage('');
+      await loungeApi.joinPokerRoom(roomCode, 'Guest');
+      setIsJoined(true);
+      await handleNewHand(roomCode);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to join this room.';
+      setErrorMessage(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleNewHand = async (code = roomCode) => {
+    try {
+      setIsSubmitting(true);
+      setErrorMessage('');
+      const hand = await loungeApi.newPokerHand(code, 'Guest');
+      setHandId(hand.id);
+      setPlayerCards(hand.playerCards);
+      setCommunityCards(hand.communityCards);
+      setRevealStage(hand.revealStage);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to start a new hand.';
+      setErrorMessage(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleRevealNext = async () => {
+    if (!handId || revealStage >= 3) {
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setErrorMessage('');
+      const hand = await loungeApi.revealPoker(handId);
+      setCommunityCards(hand.communityCards);
+      setRevealStage(hand.revealStage);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to reveal next card.';
+      setErrorMessage(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (!isJoined) {
+    return (
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="max-w-md mx-auto px-6 pt-32 pb-32 flex flex-col items-center"
+      >
+        <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mb-8">
+          <Users size={40} className="text-primary" />
+        </div>
+        <h1 className="font-headline text-4xl font-extrabold text-center mb-4">Join a Room</h1>
+        <p className="text-center text-on-surface-variant mb-8 font-medium">Enter a 4-digit code to join your friends at the table.</p>
+        
+        <div className="w-full flex flex-col gap-4">
+          <input 
+            type="text" 
+            maxLength={4}
+            placeholder="0000"
+            value={roomCode}
+            onChange={(e) => setRoomCode(e.target.value.replace(/\D/g, ''))}
+            className="w-full py-5 bg-surface-container-low border-2 border-surface-container-high rounded-2xl text-center text-4xl font-black tracking-[0.5em] focus:border-primary focus:outline-none transition-all"
+          />
+          <button 
+            onClick={handleJoin}
+            disabled={roomCode.length !== 4 || isSubmitting}
+            className="w-full py-5 bg-primary text-on-primary rounded-2xl font-headline font-extrabold text-lg tracking-widest hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-50"
+          >
+            {isSubmitting ? 'JOINING...' : 'JOIN TABLE'}
+          </button>
+          {errorMessage && (
+            <p className="text-center text-sm text-error font-medium">{errorMessage}</p>
+          )}
+        </div>
+      </motion.div>
+    );
+  }
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="max-w-5xl mx-auto px-6 pt-12 pb-32"
+    >
+      <div className="flex justify-between items-center mb-12">
+        <div>
+          <div className="inline-flex items-center gap-2 bg-secondary-container/60 px-3 py-1 rounded-full mb-4">
+            <Users size={12} className="text-on-secondary-container" />
+            <span className="text-[10px] font-bold tracking-[0.2em] uppercase text-on-secondary-container">Room: {roomCode}</span>
+          </div>
+          <h1 className="font-headline text-5xl font-extrabold tracking-tighter text-on-surface">德州扑克</h1>
+        </div>
+        <button 
+          onClick={() => handleNewHand(roomCode)}
+          disabled={isSubmitting}
+          className="p-4 bg-surface-container-low rounded-2xl hover:bg-surface-container-high transition-colors"
+          title="New Hand"
+        >
+          <RotateCcw size={20} />
+        </button>
+      </div>
+
+      <div className="bg-primary/5 rounded-[3rem] p-12 flex flex-col items-center justify-center min-h-[480px] relative overflow-hidden border border-primary/10">
+        {/* Poker Table Background */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(var(--color-primary-rgb),0.1),transparent)] pointer-events-none"></div>
+        <div className="absolute w-[120%] h-[120%] border-[40px] border-primary/5 rounded-[50%] -top-[10%] -left-[10%] pointer-events-none opacity-20"></div>
+
+        {/* Community Cards */}
+        <div className="flex gap-3 mb-12 z-10">
+          <AnimatePresence mode="popLayout">
+            {[0, 1, 2, 3, 4].map((idx) => (
+              <motion.div 
+                key={`community-${idx}`}
+                initial={{ scale: 0.8, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                className="w-20 h-28 sm:w-24 sm:h-36 bg-white rounded-2xl editorial-shadow border border-surface-container-high flex flex-col items-center justify-between p-3 sm:p-4 relative overflow-hidden"
+              >
+                {communityCards[idx] ? (
+                  <>
+                    <span className={`self-start font-headline font-black text-lg sm:text-xl leading-none ${communityCards[idx].c}`}>{communityCards[idx].v}</span>
+                    <span className={`material-symbols-outlined text-3xl sm:text-4xl ${communityCards[idx].c}`} style={{ fontVariationSettings: "'FILL' 1" }}>{communityCards[idx].s}</span>
+                    <span className={`self-end rotate-180 font-headline font-black text-lg sm:text-xl leading-none ${communityCards[idx].c}`}>{communityCards[idx].v}</span>
+                  </>
+                ) : (
+                  <div className="absolute inset-0 bg-primary/10 flex items-center justify-center">
+                    <div className="w-12 h-16 border-2 border-primary/20 rounded-lg flex items-center justify-center">
+                      <span className="material-symbols-outlined text-primary/20">playing_cards</span>
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
+
+        {/* Action Button */}
+        <div className="z-10 mb-12">
+          {revealStage < 3 ? (
+            <button 
+              onClick={handleRevealNext}
+              disabled={isSubmitting}
+              className="px-8 py-4 bg-primary text-on-primary rounded-full font-headline font-bold text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all"
+            >
+              {revealStage === 0 ? 'Reveal Flop' : revealStage === 1 ? 'Reveal Turn' : 'Reveal River'}
+            </button>
+          ) : (
+            <div className="px-8 py-4 bg-secondary-container text-on-secondary-container rounded-full font-headline font-bold text-sm uppercase tracking-widest">
+              All Cards Revealed
+            </div>
+          )}
+        </div>
+
+        {/* Player Cards */}
+        <div className="absolute -bottom-16 flex gap-2 -rotate-2">
+          {playerCards.map((card, idx) => (
+            <motion.div 
+              key={`player-card-${idx}`}
+              whileHover={{ y: -20, rotate: 0 }}
+              className={`w-24 h-36 bg-white rounded-2xl border border-surface-container-high shadow-2xl flex flex-col items-center justify-between p-4 ${idx === 0 ? '-mr-10 z-10' : 'z-0'} cursor-pointer transition-transform`}
+            >
+              <span className={`self-start font-headline font-black text-xl leading-none ${card.c}`}>{card.v}</span>
+              <span className={`material-symbols-outlined text-4xl ${card.c}`} style={{ fontVariationSettings: "'FILL' 1" }}>{card.s}</span>
+              <span className={`self-end rotate-180 font-headline font-black text-xl leading-none ${card.c}`}>{card.v}</span>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+
+      {errorMessage && (
+        <p className="text-center text-sm text-error font-medium mt-4">{errorMessage}</p>
+      )}
+
+      <div className="fixed bottom-32 w-full max-w-lg left-1/2 -translate-x-1/2 flex gap-4 px-6">
+        <button className="flex-1 py-4 bg-surface-container-high rounded-2xl text-on-surface-variant font-headline font-bold text-xs uppercase tracking-[0.2em] hover:bg-surface-container-highest transition-all active:scale-95">
+          Fold
+        </button>
+        <button className="flex-1 py-4 bg-secondary-container rounded-2xl text-on-secondary-container font-headline font-bold text-xs uppercase tracking-[0.2em] hover:opacity-90 transition-all active:scale-95">
+          Call
+        </button>
+        <button className="flex-1 py-4 bg-primary text-on-primary rounded-2xl font-headline font-bold text-xs uppercase tracking-[0.2em] hover:opacity-90 transition-all active:scale-95 shadow-lg">
+          Raise
+        </button>
+      </div>
+    </motion.div>
+  );
+};
+
+const LadyCardsView = () => {
+  const CARD_RULES: Record<string, { name: string, rule: string, icon: string }> = {
+    'A': { name: 'Ace', rule: '选人喝酒', icon: 'person_add' },
+    '2': { name: '2', rule: '是小姐', icon: 'woman' },
+    '3': { name: '3', rule: '逛三园', icon: 'park' },
+    '4': { name: '4', rule: '南北大战', icon: 'groups' },
+    '5': { name: '5', rule: '照相机', icon: 'photo_camera' },
+    '6': { name: '6', rule: '摸鼻子', icon: 'face' },
+    '7': { name: '7', rule: '逢七过', icon: 'filter_7' },
+    '8': { name: '8', rule: '厕所牌', icon: 'wc' },
+    '9': { name: '9', rule: '自己喝酒', icon: 'local_bar' },
+    '10': { name: '10', rule: '神经病', icon: 'psychology' },
+    'J': { name: 'Jack', rule: '左边喝', icon: 'arrow_back' },
+    'Q': { name: 'Queen', rule: '右边喝', icon: 'arrow_forward' },
+    'K': { name: 'King', rule: '自己定', icon: 'edit' },
+  };
+
+  const SUITS = [
+    { name: 'Hearts', icon: 'favorite', color: 'text-error' },
+    { name: 'Spades', icon: 'playing_cards', color: 'text-on-surface' },
+    { name: 'Diamonds', icon: 'diamond', color: 'text-error' },
+    { name: 'Clubs', icon: 'filter_vintage', color: 'text-on-surface' },
+  ];
+
+  const [currentCard, setCurrentCard] = useState<LadyCard>({ 
+    v: 'A', 
+    s: SUITS[0], 
+    rule: CARD_RULES['A'].rule,
+    icon: CARD_RULES['A'].icon,
+    name: 'Ace of Hearts'
+  });
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [showRules, setShowRules] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const drawCard = async () => {
+    setIsDrawing(true);
+    setErrorMessage('');
+
+    try {
+      const draw = await loungeApi.drawLadyCard('Guest');
+      setCurrentCard(draw.card);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to draw card.';
+      setErrorMessage(message);
+    } finally {
+      setIsDrawing(false);
+    }
+  };
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="max-w-5xl mx-auto px-6 pt-12 pb-32 flex flex-col items-center"
+    >
+      <div className="mb-12 flex flex-col items-center">
+        <span className="px-5 py-2 bg-secondary-container/60 backdrop-blur-md rounded-full text-[11px] font-bold uppercase tracking-[0.2em] text-on-secondary-container">
+          Current Dealer
+        </span>
+        <p className="mt-4 font-headline text-2xl font-bold text-on-surface">Alex Mercer</p>
+      </div>
+
+      <motion.div 
+        animate={isDrawing ? { rotateY: 180, scale: 0.9, opacity: 0.5 } : { rotateY: 0, scale: 1, opacity: 1 }}
+        transition={{ type: "spring", stiffness: 260, damping: 20 }}
+        className="relative w-full max-w-[340px] aspect-[2/3] bg-white rounded-[2.5rem] editorial-shadow flex flex-col items-center justify-between p-12 border border-surface-container-high overflow-hidden"
+      >
+        {/* Card Corners */}
+        <div className="absolute top-10 left-10 flex flex-col items-center leading-none">
+          <span className={`font-headline text-4xl font-black ${currentCard.s.color}`}>{currentCard.v}</span>
+          <span className={`material-symbols-outlined text-2xl ${currentCard.s.color}`} style={{ fontVariationSettings: "'FILL' 1" }}>{currentCard.s.icon}</span>
+        </div>
+        <div className="absolute bottom-10 right-10 flex flex-col items-center leading-none rotate-180">
+          <span className={`font-headline text-4xl font-black ${currentCard.s.color}`}>{currentCard.v}</span>
+          <span className={`material-symbols-outlined text-2xl ${currentCard.s.color}`} style={{ fontVariationSettings: "'FILL' 1" }}>{currentCard.s.icon}</span>
+        </div>
+
+        {/* Central Icon */}
+        <div className="mt-12 w-40 h-40 flex items-center justify-center rounded-full bg-surface-container-low border border-surface-container-high relative">
+          <div className="absolute inset-0 rounded-full border-4 border-dashed border-surface-container-highest opacity-20 animate-[spin_20s_linear_infinite]"></div>
+          <span className={`material-symbols-outlined text-7xl ${currentCard.s.color}`} style={{ fontVariationSettings: "'wght' 200" }}>
+            {currentCard.icon}
+          </span>
+        </div>
+
+        {/* Rule Display */}
+        <div className="text-center z-10 w-full">
+          <h2 className="font-headline text-3xl font-extrabold tracking-tight text-on-surface mb-2">{currentCard.name}</h2>
+          <div className="w-12 h-1 bg-primary/20 mx-auto mb-6 rounded-full"></div>
+          <div className="bg-surface-container-lowest py-4 px-6 rounded-2xl border border-surface-container-high">
+            <p className="font-headline text-xl font-bold text-primary">
+              {currentCard.rule}
+            </p>
+          </div>
+        </div>
+      </motion.div>
+
+      <div className="mt-16 w-full max-w-[340px] flex flex-col gap-4">
+        <button 
+          onClick={drawCard}
+          disabled={isDrawing}
+          className="w-full py-6 bg-primary text-on-primary font-headline font-bold rounded-2xl active:scale-[0.98] transition-all shadow-xl text-lg disabled:opacity-50"
+        >
+          {isDrawing ? 'Drawing...' : 'Draw Next Card'}
+        </button>
+        <button 
+          onClick={() => setShowRules(true)}
+          className="w-full py-5 bg-surface-container-low text-on-surface-variant font-headline font-bold rounded-2xl hover:bg-surface-container-high transition-colors text-sm uppercase tracking-widest"
+        >
+          View Rules
+        </button>
+        {errorMessage && (
+          <p className="text-center text-sm text-error font-medium">{errorMessage}</p>
+        )}
+      </div>
+
+      {/* Rules Modal */}
+      <AnimatePresence>
+        {showRules && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-surface/80 backdrop-blur-xl"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="w-full max-w-lg bg-surface-container-lowest rounded-[2.5rem] editorial-shadow border border-surface-container-high overflow-hidden flex flex-col max-h-[80vh]"
+            >
+              <div className="p-8 border-b border-surface-container-high flex justify-between items-center">
+                <h3 className="font-headline text-2xl font-bold text-on-surface">Game Rules</h3>
+                <button 
+                  onClick={() => setShowRules(false)}
+                  className="w-10 h-10 rounded-full bg-surface-container-low flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high transition-colors"
+                >
+                  <span className="material-symbols-outlined">close</span>
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-8">
+                <div className="grid grid-cols-1 gap-4">
+                  {Object.entries(CARD_RULES).map(([key, value]) => (
+                    <div key={key} className="flex items-center gap-6 p-4 rounded-2xl bg-surface-container-low border border-surface-container-high">
+                      <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-headline text-xl font-black">
+                        {key}
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-headline font-bold text-on-surface">{value.name}</p>
+                        <p className="text-sm text-on-surface-variant">{value.rule}</p>
+                      </div>
+                      <span className="material-symbols-outlined text-on-surface-variant/30">{value.icon}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="p-8 bg-surface-container-low border-t border-surface-container-high">
+                <button 
+                  onClick={() => setShowRules(false)}
+                  className="w-full py-4 bg-on-surface text-surface rounded-2xl font-headline font-bold text-sm uppercase tracking-widest"
+                >
+                  Got it
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+};
+
+// --- Main App ---
+
+export default function App() {
+  const [currentView, setCurrentView] = useState<GameType>('LOBBY');
+  const [activeTab, setActiveTab] = useState('home');
+  const [credits] = useState(1250);
+  const [rooms, setRooms] = useState<GameRoom[]>(ROOMS);
+  const [isRoomsLoading, setIsRoomsLoading] = useState(true);
+
+  useEffect(() => {
+    const loadRooms = async () => {
+      try {
+        setIsRoomsLoading(true);
+        const fetchedRooms = await loungeApi.getRooms();
+        if (fetchedRooms.length > 0) {
+          setRooms(fetchedRooms);
+        }
+      } catch (error) {
+        console.error('Failed to load rooms from backend:', error);
+      } finally {
+        setIsRoomsLoading(false);
+      }
+    };
+
+    loadRooms();
+  }, []);
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    if (tab === 'home') setCurrentView('LOBBY');
+  };
+
+  return (
+    <div className="min-h-screen bg-surface selection:bg-secondary/20">
+      <TopAppBar 
+        credits={credits} 
+        onBack={() => setCurrentView('LOBBY')} 
+      />
+      
+      <main className="relative">
+        <AnimatePresence mode="wait">
+          {currentView === 'LOBBY' && (
+            <motion.div key="lobby">
+              <LobbyView onSelectGame={setCurrentView} rooms={rooms} isLoading={isRoomsLoading} />
+            </motion.div>
+          )}
+          {currentView === 'DICE' && (
+            <motion.div key="dice">
+              <DiceGameView />
+            </motion.div>
+          )}
+          {currentView === 'POKER' && (
+            <motion.div key="poker">
+              <PokerGameView />
+            </motion.div>
+          )}
+          {currentView === 'LADY_CARDS' && (
+            <motion.div key="lady">
+              <LadyCardsView />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </main>
+
+      <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />
+
+      {/* Background Decoration */}
+      <div className="fixed top-0 right-0 -z-10 w-1/2 h-screen opacity-[0.03] pointer-events-none overflow-hidden">
+        <svg className="h-full w-full" viewBox="0 0 100 100">
+          <path d="M50 0 L100 50 L50 100 L0 50 Z" fill="currentColor" className="text-primary" />
+        </svg>
+      </div>
+    </div>
+  );
+}

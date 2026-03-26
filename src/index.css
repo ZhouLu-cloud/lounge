@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+@theme {
+  --font-headline: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
+  
+  --color-primary: #5b5f63;
+  --color-on-primary: #f5f8fd;
+  --color-secondary: #53616a;
+  --color-on-secondary: #f4faff;
+  --color-secondary-container: #d6e5ef;
+  --color-on-secondary-container: #46545d;
+  --color-surface: #f8f9fa;
+  --color-on-surface: #2b3437;
+  --color-surface-container-low: #f1f4f6;
+  --color-surface-container-high: #e3e9ec;
+  --color-surface-container-highest: #dbe4e7;
+  --color-surface-container-lowest: #ffffff;
+  --color-outline: #737c7f;
+  --color-outline-variant: #abb3b7;
+  --color-error: #9f403d;
+}
+
+@layer base {
+  body {
+    @apply bg-surface text-on-surface font-body antialiased;
+  }
+}
+
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;700;800&family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap');
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+}
+
+.editorial-shadow {
+  box-shadow: 0 10px 40px rgba(43, 52, 55, 0.04);
+}
+
+.poker-table-grid {
+  background-image: linear-gradient(#e3e9ec 1px, transparent 1px), linear-gradient(90deg, #e3e9ec 1px, transparent 1px);
+  background-size: 40px 40px;
+}
