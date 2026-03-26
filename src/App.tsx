@@ -746,6 +746,19 @@ const LadyCardsView = () => {
             </p>
           </div>
         </div>
+              {/* Central Icon - Value and Suit */}
+              <div className="mt-12 flex flex-col items-center justify-center gap-6 z-10">
+                <span className={`font-headline text-8xl font-black ${currentCard.s.color}`}>
+                  {currentCard.v}
+                </span>
+                <span className={`material-symbols-outlined text-7xl ${currentCard.s.color}`} style={{ fontVariationSettings: "'FILL' 1" }}>
+                  {currentCard.s.icon}
+                </span>
+              </div>
+
+              {/* Rule Display */}
+              <div>
+              </div>
       </motion.div>
 
       <div className="mt-16 w-full max-w-[340px] flex flex-col gap-4">
