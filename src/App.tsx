@@ -205,17 +205,18 @@ const DiceGameView = () => {
 
   const handleShake = async () => {
     setIsShaking(true);
-    setIsRevealed(false);
     setErrorMessage('');
 
     try {
       await new Promise((resolve) => setTimeout(resolve, 600));
       const result = await loungeApi.rollDice(diceCount, 'Guest');
       setResults(result.results);
+      setIsRevealed(true);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to roll dice.';
       setErrorMessage(message);
       setResults(Array.from({ length: diceCount }, () => 1));
+      setIsRevealed(true);
     } finally {
       setIsShaking(false);
     }
@@ -362,6 +363,7 @@ const PokerGameView = () => {
   const [handId, setHandId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [playerCardsRevealed, setPlayerCardsRevealed] = useState(false);
 
   const handleJoin = async () => {
     if (roomCode.length !== 4) {
@@ -391,6 +393,7 @@ const PokerGameView = () => {
       setPlayerCards(hand.playerCards);
       setCommunityCards(hand.communityCards);
       setRevealStage(hand.revealStage);
+      setPlayerCardsRevealed(false);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to start a new hand.';
       setErrorMessage(message);
@@ -535,11 +538,20 @@ const PokerGameView = () => {
             <motion.div 
               key={`player-card-${idx}`}
               whileHover={{ y: -20, rotate: 0 }}
-              className={`w-24 h-36 bg-white rounded-2xl border border-surface-container-high shadow-2xl flex flex-col items-center justify-between p-4 ${idx === 0 ? '-mr-10 z-10' : 'z-0'} cursor-pointer transition-transform`}
+              onClick={() => setPlayerCardsRevealed(!playerCardsRevealed)}
+              className={`w-24 h-36 rounded-2xl border-2 shadow-2xl flex flex-col items-center justify-between p-4 ${idx === 0 ? '-mr-10 z-10' : 'z-0'} cursor-pointer transition-all ${playerCardsRevealed ? 'bg-white border-surface-container-high' : 'bg-primary border-primary'}`}
             >
-              <span className={`self-start font-headline font-black text-xl leading-none ${card.c}`}>{card.v}</span>
-              <span className={`material-symbols-outlined text-4xl ${card.c}`} style={{ fontVariationSettings: "'FILL' 1" }}>{card.s}</span>
-              <span className={`self-end rotate-180 font-headline font-black text-xl leading-none ${card.c}`}>{card.v}</span>
+              {playerCardsRevealed ? (
+                <>
+                  <span className={`self-start font-headline font-black text-xl leading-none ${card.c}`}>{card.v}</span>
+                  <span className={`material-symbols-outlined text-4xl ${card.c}`} style={{ fontVariationSettings: "'FILL' 1" }}>{card.s}</span>
+                  <span className={`self-end rotate-180 font-headline font-black text-xl leading-none ${card.c}`}>{card.v}</span>
+                </>
+              ) : (
+                <div className="flex items-center justify-center w-full h-full">
+                  <span className="material-symbols-outlined text-4xl text-on-primary">playing_cards</span>
+                </div>
+              )}
             </motion.div>
           ))}
         </div>
@@ -579,39 +591,106 @@ const LadyCardsView = () => {
     'J': { name: 'Jack', rule: '左边喝', icon: 'arrow_back' },
     'Q': { name: 'Queen', rule: '右边喝', icon: 'arrow_forward' },
     'K': { name: 'King', rule: '自己定', icon: 'edit' },
+    'LJ': { name: 'Little Joker', rule: '自己喝酒', icon: 'local_bar' },
+    'BJ': { name: 'Big Joker', rule: 'Hard mode: 逢七过×2', icon: 'filter_7' },
   };
 
-  const SUITS = [
+  const SUITS: Array<{ name: string; icon: string; color: 'text-error' | 'text-on-surface' }> = [
     { name: 'Hearts', icon: 'favorite', color: 'text-error' },
     { name: 'Spades', icon: 'playing_cards', color: 'text-on-surface' },
     { name: 'Diamonds', icon: 'diamond', color: 'text-error' },
     { name: 'Clubs', icon: 'filter_vintage', color: 'text-on-surface' },
   ];
 
-  const [currentCard, setCurrentCard] = useState<LadyCard>({ 
-    v: 'A', 
-    s: SUITS[0], 
-    rule: CARD_RULES['A'].rule,
-    icon: CARD_RULES['A'].icon,
-    name: 'Ace of Hearts'
-  });
+  interface LadyCardInDeck {
+    v: string;
+    s: { name: string; icon: string; color: 'text-error' | 'text-on-surface' };
+    rule: string;
+    icon: string;
+    name: string;
+  }
+
+  const buildDeck = (): LadyCardInDeck[] => {
+    const deck: LadyCardInDeck[] = [];
+    const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+
+    // Add 52 cards (4 suits × 13 values)
+    for (const suit of SUITS) {
+      for (const v of values) {
+        deck.push({
+          v,
+          s: suit,
+          rule: CARD_RULES[v].rule,
+          icon: CARD_RULES[v].icon,
+          name: `${CARD_RULES[v].name} of ${suit.name}`,
+        });
+      }
+    }
+
+    // Add Jokers (小王 and 大王)
+    deck.push({
+      v: 'LJ',
+      s: SUITS[0],
+      rule: CARD_RULES['LJ'].rule,
+      icon: CARD_RULES['LJ'].icon,
+      name: 'Little Joker',
+    });
+
+    deck.push({
+      v: 'BJ',
+      s: SUITS[0],
+      rule: CARD_RULES['BJ'].rule,
+      icon: CARD_RULES['BJ'].icon,
+      name: 'Big Joker',
+    });
+
+    // Shuffle deck
+    for (let i = deck.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+
+    return deck;
+  };
+
+  const [deck, setDeck] = useState<LadyCardInDeck[]>(buildDeck);
+  const [drawnIndices, setDrawnIndices] = useState<Set<number>>(new Set());
+  const [currentCard, setCurrentCard] = useState<LadyCardInDeck>(deck[0]);
   const [isDrawing, setIsDrawing] = useState(false);
   const [showRules, setShowRules] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const drawCard = async () => {
+  const remainingCount = deck.length - drawnIndices.size;
+  const isDeckEmpty = remainingCount === 0;
+
+  const drawCard = () => {
+    if (isDeckEmpty) {
+      setErrorMessage('All cards drawn! Reshuffle to continue.');
+      return;
+    }
+
     setIsDrawing(true);
     setErrorMessage('');
 
-    try {
-      const draw = await loungeApi.drawLadyCard('Guest');
-      setCurrentCard(draw.card);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to draw card.';
-      setErrorMessage(message);
-    } finally {
+    setTimeout(() => {
+      // Find random undrawn card
+      let randomIdx: number;
+      do {
+        randomIdx = Math.floor(Math.random() * deck.length);
+      } while (drawnIndices.has(randomIdx));
+
+      setDrawnIndices((prev) => new Set([...prev, randomIdx]));
+      setCurrentCard(deck[randomIdx]);
       setIsDrawing(false);
-    }
+    }, 500);
+  };
+
+  const reshuffle = () => {
+    const newDeck = buildDeck();
+    setDeck(newDeck);
+    setDrawnIndices(new Set());
+    setCurrentCard(newDeck[0]);
+    setErrorMessage('');
   };
 
   return (
@@ -622,9 +701,16 @@ const LadyCardsView = () => {
     >
       <div className="mb-12 flex flex-col items-center">
         <span className="px-5 py-2 bg-secondary-container/60 backdrop-blur-md rounded-full text-[11px] font-bold uppercase tracking-[0.2em] text-on-secondary-container">
-          Current Dealer
+          Card Draw Session
         </span>
-        <p className="mt-4 font-headline text-2xl font-bold text-on-surface">Alex Mercer</p>
+        <p className="mt-4 font-headline text-2xl font-bold text-on-surface">小姐牌</p>
+        <p className="mt-2 text-sm text-on-surface-variant font-medium">
+          {isDeckEmpty ? (
+            <span className="text-error">All 54 cards drawn!</span>
+          ) : (
+            <span>{remainingCount} cards remaining</span>
+          )}
+        </p>
       </div>
 
       <motion.div 
@@ -665,11 +751,19 @@ const LadyCardsView = () => {
       <div className="mt-16 w-full max-w-[340px] flex flex-col gap-4">
         <button 
           onClick={drawCard}
-          disabled={isDrawing}
+          disabled={isDrawing || isDeckEmpty}
           className="w-full py-6 bg-primary text-on-primary font-headline font-bold rounded-2xl active:scale-[0.98] transition-all shadow-xl text-lg disabled:opacity-50"
         >
-          {isDrawing ? 'Drawing...' : 'Draw Next Card'}
+          {isDrawing ? 'Drawing...' : isDeckEmpty ? 'Deck Empty' : 'Draw Next Card'}
         </button>
+        {isDeckEmpty && (
+          <button 
+            onClick={reshuffle}
+            className="w-full py-6 bg-secondary text-on-secondary font-headline font-bold rounded-2xl active:scale-[0.98] transition-all shadow-xl text-lg"
+          >
+            Reshuffle (54 Cards)
+          </button>
+        )}
         <button 
           onClick={() => setShowRules(true)}
           className="w-full py-5 bg-surface-container-low text-on-surface-variant font-headline font-bold rounded-2xl hover:bg-surface-container-high transition-colors text-sm uppercase tracking-widest"

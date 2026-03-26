@@ -73,6 +73,62 @@ const LADY_SUITS: CardSuit[] = [
   { name: 'Clubs', icon: 'filter_vintage', color: 'text-on-surface' },
 ];
 
+export interface LadyCardDeck {
+  v: string;
+  s: CardSuit;
+  rule: string;
+  icon: string;
+  name: string;
+  suit_name: string;
+}
+
+export function buildLadyCardDeck(): LadyCardDeck[] {
+  const deck: LadyCardDeck[] = [];
+  const values = Object.keys(CARD_RULES);
+
+  // Add 52 cards (4 suits × 13 values A-K)
+  for (const suit of LADY_SUITS) {
+    for (const v of values) {
+      const rule = CARD_RULES[v];
+      deck.push({
+        v,
+        s: suit,
+        rule: rule.rule,
+        icon: rule.icon,
+        name: `${rule.name} of ${suit.name}`,
+        suit_name: suit.name,
+      });
+    }
+  }
+
+  // Add Jokers (小王 and 大王)
+  deck.push({
+    v: 'LJ',
+    s: LADY_SUITS[0],
+    rule: '自己喝酒',
+    icon: 'local_bar',
+    name: 'Little Joker',
+    suit_name: 'Joker',
+  });
+
+  deck.push({
+    v: 'BJ',
+    s: LADY_SUITS[0],
+    rule: 'Hard mode: 逢七过×2',
+    icon: 'filter_7',
+    name: 'Big Joker',
+    suit_name: 'Joker',
+  });
+
+  // Shuffle deck
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+
+  return deck;
+}
+
 export function drawLadyCard() {
   const values = Object.keys(CARD_RULES);
   const randomValue = values[Math.floor(Math.random() * values.length)];
