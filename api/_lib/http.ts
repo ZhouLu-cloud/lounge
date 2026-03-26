@@ -1,12 +1,20 @@
-import { IncomingMessage, ServerResponse } from 'node:http';
-
-type ApiRequest = IncomingMessage & {
+type ApiRequest = {
+  method?: string;
   body?: unknown;
-};
+  on?: (event: string, listener: (...args: any[]) => void) => void;
+  [Symbol.asyncIterator]?: () => AsyncIterator<any>;
+} & Record<string, any>;
 
-type ApiResponse = ServerResponse & {
+type ApiResponse = {
+  statusCode?: number;
+  setHeader: (name: string, value: string) => void;
+  end: (body?: string) => void;
   status?: (code: number) => ApiResponse;
   json?: (body: unknown) => void;
+} & Record<string, any>;
+
+type ApiRequestBodyCarrier = {
+  body?: unknown;
 };
 
 export type JsonRecord = Record<string, unknown>;
@@ -31,21 +39,42 @@ export function methodNotAllowed(req: ApiRequest, res: ApiResponse, allowed: str
 }
 
 export async function parseJsonBody<T = JsonRecord>(req: ApiRequest): Promise<T> {
-  if (req.body && typeof req.body === 'object') {
-    return req.body as T;
+  if ((req as ApiRequestBodyCarrier).body && typeof (req as ApiRequestBodyCarrier).body === 'object') {
+    return (req as ApiRequestBodyCarrier).body as T;
   }
 
-  const chunks: Buffer[] = [];
-  for await (const chunk of req) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  if (typeof req[Symbol.asyncIterator] === 'function') {
+    const chunks: Uint8Array[] = [];
+    for await (const chunk of req as any) {
+      if (chunk instanceof Uint8Array) {
+        chunks.push(chunk);
+      } else {
+        chunks.push(new TextEncoder().encode(String(chunk)));
+      }
+    }
+
+    if (!chunks.length) {
+      return {} as T;
+    }
+
+    const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+    const merged = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const chunk of chunks) {
+      merged.set(chunk, offset);
+      offset += chunk.length;
+    }
+
+    const raw = new TextDecoder().decode(merged);
+    return raw ? (JSON.parse(raw) as T) : ({} as T);
   }
 
-  if (!chunks.length) {
-    return {} as T;
+  const fallbackBody = (req as ApiRequestBodyCarrier).body;
+  if (typeof fallbackBody === 'string' && fallbackBody.trim()) {
+    return JSON.parse(fallbackBody) as T;
   }
 
-  const raw = Buffer.concat(chunks).toString('utf8');
-  return JSON.parse(raw) as T;
+  return {} as T;
 }
 
 export function handleApiError(res: ApiResponse, error: unknown, fallback = 'Internal server error') {
