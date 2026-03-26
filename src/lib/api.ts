@@ -40,6 +40,7 @@ type LadyDrawResponse = {
 
 type PokerJoinResponse = {
   ok: true;
+  isHost: boolean;
   room: {
     code: string;
     name: string;
@@ -53,6 +54,24 @@ type PokerJoinResponse = {
 type PokerHandResponse = {
   ok: true;
   hand: PokerHand;
+};
+
+type PokerRoomStatusResponse = {
+  ok: true;
+  room: {
+    code: string;
+    name: string;
+    players: number;
+    maxPlayers: number;
+    status: string;
+  };
+  hand: {
+    id: string;
+    playerCards: PokerCard[];
+    communityCards: PokerCard[];
+    revealStage: number;
+    createdAt: string;
+  } | null;
 };
 
 export const loungeApi = {
@@ -89,14 +108,25 @@ export const loungeApi = {
   joinPokerRoom: async (roomCode: string, playerName = 'Guest') => {
     return request<PokerJoinResponse>('/api/poker-join', {
       method: 'POST',
-      body: JSON.stringify({ roomCode, playerName }),
+      body: JSON.stringify({ roomCode, playerName, createRoom: false }),
     });
   },
 
-  newPokerHand: async (roomCode: string, playerName = 'Guest') => {
+  createPokerRoom: async (roomCode: string, maxPlayers: number, playerName = 'Guest') => {
+    return request<PokerJoinResponse>('/api/poker-join', {
+      method: 'POST',
+      body: JSON.stringify({ roomCode, playerName, createRoom: true, maxPlayers }),
+    });
+  },
+
+  getPokerRoomStatus: async (roomCode: string) => {
+    return request<PokerRoomStatusResponse>(`/api/poker-room-status?roomCode=${encodeURIComponent(roomCode)}`);
+  },
+
+  newPokerHand: async (roomCode: string, playerName = 'Guest', isHost = false) => {
     const data = await request<PokerHandResponse>('/api/poker-new-hand', {
       method: 'POST',
-      body: JSON.stringify({ roomCode, playerName }),
+      body: JSON.stringify({ roomCode, playerName, isHost }),
     });
 
     return data.hand;

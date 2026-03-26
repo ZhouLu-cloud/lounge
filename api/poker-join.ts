@@ -4,6 +4,8 @@ import { handleApiError, methodNotAllowed, parseJsonBody, sendJson } from './_li
 type JoinBody = {
   roomCode?: string;
   playerName?: string;
+  createRoom?: boolean;
+  maxPlayers?: number;
 };
 
 const ROOM_CODE_REGEX = /^\d{4}$/;
@@ -16,9 +18,15 @@ export default async function handler(req: any, res: any) {
 
     const body = await parseJsonBody<JoinBody>(req);
     const roomCode = (body.roomCode ?? '').trim();
+    const createRoom = Boolean(body.createRoom);
+    const requestedMaxPlayers = Number(body.maxPlayers ?? 6);
 
     if (!ROOM_CODE_REGEX.test(roomCode)) {
       return sendJson(res, 400, { ok: false, error: 'roomCode must be 4 digits.' });
+    }
+
+    if (createRoom && (!Number.isInteger(requestedMaxPlayers) || requestedMaxPlayers < 2 || requestedMaxPlayers > 9)) {
+      return sendJson(res, 400, { ok: false, error: 'maxPlayers must be an integer between 2 and 9.' });
     }
 
     const supabase = getSupabaseAdmin() as any;
@@ -32,7 +40,15 @@ export default async function handler(req: any, res: any) {
       throw fetchError;
     }
 
-    if (!existingRoom) {
+    if (createRoom && existingRoom) {
+      return sendJson(res, 400, { ok: false, error: 'Room code already exists.' });
+    }
+
+    if (!createRoom && !existingRoom) {
+      return sendJson(res, 404, { ok: false, error: 'Room not found. Ask host to create the room first.' });
+    }
+
+    if (!existingRoom && createRoom) {
       const { data: createdRoom, error: createError } = await supabase
         .from('game_rooms')
         .insert({
@@ -40,7 +56,7 @@ export default async function handler(req: any, res: any) {
           name: `Poker Room ${roomCode}`,
           game_type: 'POKER',
           players: 1,
-          max_players: 9,
+          max_players: requestedMaxPlayers,
           status: 'waiting',
         })
         .select('id, room_code, game_type, players, max_players, name, status')
@@ -56,6 +72,7 @@ export default async function handler(req: any, res: any) {
 
       return sendJson(res, 200, {
         ok: true,
+        isHost: true,
         room: {
           code: createdRoom.room_code,
           name: createdRoom.name,
@@ -67,12 +84,20 @@ export default async function handler(req: any, res: any) {
       });
     }
 
+    if (!existingRoom) {
+      return sendJson(res, 500, { ok: false, error: 'Room lookup failed.' });
+    }
+
     if (existingRoom.game_type !== 'POKER') {
       return sendJson(res, 400, { ok: false, error: 'This room is not a poker room.' });
     }
 
+    if (existingRoom.players >= existingRoom.max_players) {
+      return sendJson(res, 400, { ok: false, error: 'Room is full.' });
+    }
+
     const nextPlayers = Math.min(existingRoom.players + 1, existingRoom.max_players);
-    const nextStatus = nextPlayers >= existingRoom.max_players ? 'full' : 'active';
+    const nextStatus = nextPlayers >= existingRoom.max_players ? 'full' : 'waiting';
 
     const { data: updatedRoom, error: updateError } = await supabase
       .from('game_rooms')
@@ -94,6 +119,7 @@ export default async function handler(req: any, res: any) {
 
     return sendJson(res, 200, {
       ok: true,
+      isHost: false,
       room: {
         code: updatedRoom.room_code,
         name: updatedRoom.name,

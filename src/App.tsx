@@ -195,6 +195,15 @@ const LobbyView = ({ onSelectGame, rooms, isLoading }: { onSelectGame: (type: Ga
 };
 
 const DiceGameView = () => {
+  const pipLayout: Record<number, Array<[number, number]>> = {
+    1: [[1, 1]],
+    2: [[0, 0], [2, 2]],
+    3: [[0, 0], [1, 1], [2, 2]],
+    4: [[0, 0], [0, 2], [2, 0], [2, 2]],
+    5: [[0, 0], [0, 2], [1, 1], [2, 0], [2, 2]],
+    6: [[0, 0], [0, 1], [0, 2], [2, 0], [2, 1], [2, 2]],
+  };
+
   const [diceCount, setDiceCount] = useState(5);
   const [results, setResults] = useState<number[]>([]);
   const [isShaking, setIsShaking] = useState(false);
@@ -290,9 +299,19 @@ const DiceGameView = () => {
                 >
                   {/* Front (Value) */}
                   <div className={`absolute inset-0 flex items-center justify-center backface-hidden ${showDice ? 'opacity-100' : 'opacity-0'}`}>
-                    <span className="material-symbols-outlined text-4xl sm:text-5xl text-primary" style={{ fontVariationSettings: "'FILL' 1" }}>
-                      {`filter_${val}`}
-                    </span>
+                    <div className="grid grid-cols-3 grid-rows-3 gap-1 w-10 h-10 sm:w-12 sm:h-12">
+                      {Array.from({ length: 9 }).map((_, cellIndex) => {
+                        const row = Math.floor(cellIndex / 3);
+                        const col = cellIndex % 3;
+                        const isActive = (pipLayout[val] ?? []).some(([r, c]) => r === row && c === col);
+
+                        return (
+                          <div key={cellIndex} className="flex items-center justify-center">
+                            <div className={`rounded-full transition-all ${isActive ? 'w-2.5 h-2.5 sm:w-3 sm:h-3 bg-primary' : 'w-1.5 h-1.5 sm:w-2 sm:h-2 bg-transparent'}`} />
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                   {/* Back (Hidden) */}
                   <div className={`absolute inset-0 flex items-center justify-center bg-primary rounded-2xl backface-hidden rotate-y-180 ${showDice ? 'opacity-0' : 'opacity-100'}`}>
@@ -355,7 +374,13 @@ const DiceGameView = () => {
 };
 
 const PokerGameView = () => {
+  const [mode, setMode] = useState<'create' | 'join'>('join');
+  const [maxPlayers, setMaxPlayers] = useState(6);
   const [roomCode, setRoomCode] = useState('');
+  const [roomPlayers, setRoomPlayers] = useState(0);
+  const [roomMaxPlayers, setRoomMaxPlayers] = useState(0);
+  const [roomStatus, setRoomStatus] = useState<'waiting' | 'full' | 'active'>('waiting');
+  const [isHost, setIsHost] = useState(false);
   const [isJoined, setIsJoined] = useState(false);
   const [communityCards, setCommunityCards] = useState<PokerCard[]>([]);
   const [revealStage, setRevealStage] = useState(0); // 0: Pre-flop, 1: Flop, 2: Turn, 3: River
@@ -365,6 +390,38 @@ const PokerGameView = () => {
   const [errorMessage, setErrorMessage] = useState('');
   const [playerCardsRevealed, setPlayerCardsRevealed] = useState(false);
 
+  const isRoomFull = roomPlayers >= roomMaxPlayers && roomMaxPlayers > 0;
+  const isGameStarted = roomStatus === 'active' && !!handId;
+
+  useEffect(() => {
+    if (!isJoined || !roomCode) {
+      return;
+    }
+
+    const pollRoom = async () => {
+      try {
+        const status = await loungeApi.getPokerRoomStatus(roomCode);
+        setRoomPlayers(status.room.players);
+        setRoomMaxPlayers(status.room.maxPlayers);
+        setRoomStatus(status.room.status as 'waiting' | 'full' | 'active');
+
+        if (status.hand && status.room.status === 'active') {
+          setHandId(status.hand.id);
+          setPlayerCards(Array.isArray(status.hand.playerCards) ? status.hand.playerCards.slice(0, 2) : []);
+          setCommunityCards(Array.isArray(status.hand.communityCards) ? status.hand.communityCards : []);
+          setRevealStage(status.hand.revealStage ?? 0);
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to sync room status.';
+        setErrorMessage(message);
+      }
+    };
+
+    pollRoom();
+    const timer = setInterval(pollRoom, 3000);
+    return () => clearInterval(timer);
+  }, [isJoined, roomCode]);
+
   const handleJoin = async () => {
     if (roomCode.length !== 4) {
       return;
@@ -373,11 +430,36 @@ const PokerGameView = () => {
     try {
       setIsSubmitting(true);
       setErrorMessage('');
-      await loungeApi.joinPokerRoom(roomCode, 'Guest');
+      const result = await loungeApi.joinPokerRoom(roomCode, 'Guest');
+      setRoomPlayers(result.room.players);
+      setRoomMaxPlayers(result.room.maxPlayers);
+      setRoomStatus(result.room.status as 'waiting' | 'full' | 'active');
+      setIsHost(false);
       setIsJoined(true);
-      await handleNewHand(roomCode);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to join this room.';
+      setErrorMessage(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCreateRoom = async () => {
+    if (roomCode.length !== 4) {
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setErrorMessage('');
+      const result = await loungeApi.createPokerRoom(roomCode, maxPlayers, 'Host');
+      setRoomPlayers(result.room.players);
+      setRoomMaxPlayers(result.room.maxPlayers);
+      setRoomStatus(result.room.status as 'waiting' | 'full' | 'active');
+      setIsHost(true);
+      setIsJoined(true);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to create this room.';
       setErrorMessage(message);
     } finally {
       setIsSubmitting(false);
@@ -388,12 +470,13 @@ const PokerGameView = () => {
     try {
       setIsSubmitting(true);
       setErrorMessage('');
-      const hand = await loungeApi.newPokerHand(code, 'Guest');
+      const hand = await loungeApi.newPokerHand(code, isHost ? 'Host' : 'Guest', isHost);
       setHandId(hand.id);
       setPlayerCards(hand.playerCards);
       setCommunityCards(hand.communityCards);
       setRevealStage(hand.revealStage);
       setPlayerCardsRevealed(false);
+      setRoomStatus('active');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to start a new hand.';
       setErrorMessage(message);
@@ -403,6 +486,11 @@ const PokerGameView = () => {
   };
 
   const handleRevealNext = async () => {
+    if (!isHost) {
+      setErrorMessage('Only dealer can reveal cards each round.');
+      return;
+    }
+
     if (!handId || revealStage >= 3) {
       return;
     }
@@ -435,6 +523,38 @@ const PokerGameView = () => {
         <p className="text-center text-on-surface-variant mb-8 font-medium">Enter a 4-digit code to join your friends at the table.</p>
         
         <div className="w-full flex flex-col gap-4">
+          <div className="grid grid-cols-2 gap-2 bg-surface-container-low rounded-2xl p-1">
+            <button
+              onClick={() => setMode('join')}
+              className={`py-2 rounded-xl font-headline font-bold text-xs tracking-widest transition-all ${mode === 'join' ? 'bg-primary text-on-primary' : 'text-on-surface-variant'}`}
+            >
+              JOIN
+            </button>
+            <button
+              onClick={() => setMode('create')}
+              className={`py-2 rounded-xl font-headline font-bold text-xs tracking-widest transition-all ${mode === 'create' ? 'bg-primary text-on-primary' : 'text-on-surface-variant'}`}
+            >
+              CREATE
+            </button>
+          </div>
+
+          {mode === 'create' && (
+            <div className="bg-surface-container-low rounded-2xl p-4 border border-surface-container-high">
+              <p className="text-xs font-bold tracking-[0.2em] text-outline uppercase mb-3">Players</p>
+              <div className="grid grid-cols-4 gap-2">
+                {[2, 4, 6, 8].map((count) => (
+                  <button
+                    key={count}
+                    onClick={() => setMaxPlayers(count)}
+                    className={`py-2 rounded-xl font-bold text-sm transition-all ${maxPlayers === count ? 'bg-primary text-on-primary' : 'bg-white border border-surface-container-high'}`}
+                  >
+                    {count}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <input 
             type="text" 
             maxLength={4}
@@ -444,11 +564,11 @@ const PokerGameView = () => {
             className="w-full py-5 bg-surface-container-low border-2 border-surface-container-high rounded-2xl text-center text-4xl font-black tracking-[0.5em] focus:border-primary focus:outline-none transition-all"
           />
           <button 
-            onClick={handleJoin}
+            onClick={mode === 'create' ? handleCreateRoom : handleJoin}
             disabled={roomCode.length !== 4 || isSubmitting}
             className="w-full py-5 bg-primary text-on-primary rounded-2xl font-headline font-extrabold text-lg tracking-widest hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-50"
           >
-            {isSubmitting ? 'JOINING...' : 'JOIN TABLE'}
+            {isSubmitting ? (mode === 'create' ? 'CREATING...' : 'JOINING...') : (mode === 'create' ? 'CREATE ROOM' : 'JOIN TABLE')}
           </button>
           {errorMessage && (
             <p className="text-center text-sm text-error font-medium">{errorMessage}</p>
@@ -470,17 +590,37 @@ const PokerGameView = () => {
             <Users size={12} className="text-on-secondary-container" />
             <span className="text-[10px] font-bold tracking-[0.2em] uppercase text-on-secondary-container">Room: {roomCode}</span>
           </div>
+          <div className="inline-flex items-center gap-2 bg-surface-container-low px-3 py-1 rounded-full mb-4 ml-2">
+            <span className="text-[10px] font-bold tracking-[0.2em] uppercase text-on-surface-variant">Players: {roomPlayers}/{roomMaxPlayers || '-'}</span>
+          </div>
           <h1 className="font-headline text-5xl font-extrabold tracking-tighter text-on-surface">德州扑克</h1>
         </div>
-        <button 
-          onClick={() => handleNewHand(roomCode)}
-          disabled={isSubmitting}
-          className="p-4 bg-surface-container-low rounded-2xl hover:bg-surface-container-high transition-colors"
-          title="New Hand"
-        >
-          <RotateCcw size={20} />
-        </button>
+        {isHost ? (
+          <button 
+            onClick={() => handleNewHand(roomCode)}
+            disabled={isSubmitting || !isRoomFull || isGameStarted}
+            className="px-5 py-3 bg-primary text-on-primary rounded-2xl font-headline font-bold text-xs uppercase tracking-[0.2em] disabled:opacity-50"
+            title="Start Game"
+          >
+            {isRoomFull ? (isGameStarted ? 'GAME STARTED' : 'START GAME') : 'WAIT FOR FULL ROOM'}
+          </button>
+        ) : (
+          <button 
+            onClick={() => setPlayerCardsRevealed(!playerCardsRevealed)}
+            className="p-4 bg-surface-container-low rounded-2xl hover:bg-surface-container-high transition-colors"
+            title="Toggle My Cards"
+          >
+            <RotateCcw size={20} />
+          </button>
+        )}
       </div>
+
+      {!isGameStarted && (
+        <div className="mb-6 bg-surface-container-low rounded-2xl px-6 py-4 text-center border border-surface-container-high">
+          <p className="font-headline font-bold text-on-surface mb-1">{isHost ? '你是房主' : '等待房主开局'}</p>
+          <p className="text-sm text-on-surface-variant">{isRoomFull ? '房间已满，房主可开始发牌。' : `当前人数 ${roomPlayers}/${roomMaxPlayers || '-'}，等待人满...`}</p>
+        </div>
+      )}
 
       <div className="bg-primary/5 rounded-[3rem] p-12 flex flex-col items-center justify-center min-h-[480px] relative overflow-hidden border border-primary/10">
         {/* Poker Table Background */}
@@ -517,17 +657,21 @@ const PokerGameView = () => {
 
         {/* Action Button */}
         <div className="z-10 mb-12">
-          {revealStage < 3 ? (
+          {isGameStarted && revealStage < 3 ? (
             <button 
               onClick={handleRevealNext}
-              disabled={isSubmitting}
+              disabled={isSubmitting || !isHost}
               className="px-8 py-4 bg-primary text-on-primary rounded-full font-headline font-bold text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all"
             >
-              {revealStage === 0 ? 'Reveal Flop' : revealStage === 1 ? 'Reveal Turn' : 'Reveal River'}
+              {revealStage === 0 ? '翻牌 (Flop)' : revealStage === 1 ? '转牌 (Turn)' : '河牌 (River)'}
             </button>
-          ) : (
+          ) : isGameStarted ? (
             <div className="px-8 py-4 bg-secondary-container text-on-secondary-container rounded-full font-headline font-bold text-sm uppercase tracking-widest">
               All Cards Revealed
+            </div>
+          ) : (
+            <div className="px-8 py-4 bg-surface-container-high text-on-surface-variant rounded-full font-headline font-bold text-sm uppercase tracking-widest">
+              Waiting for host to start
             </div>
           )}
         </div>
