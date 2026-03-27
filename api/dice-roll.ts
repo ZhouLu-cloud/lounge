@@ -131,13 +131,6 @@ export default async function handler(req: any, res?: any) {
       });
     }
 
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!supabaseUrl || !serviceKey) {
-      return respond(req, res, 500, { ok: false, error: 'Missing Supabase environment variables.' });
-    }
-
     const body = await parseBody(req, res);
     const diceCount = Number(body.diceCount ?? 5);
 
@@ -148,30 +141,39 @@ export default async function handler(req: any, res?: any) {
     const results = randomDiceResults(diceCount);
     const total = results.reduce((sum, value) => sum + value, 0);
 
-    const insertRes = await fetch(`${supabaseUrl}/rest/v1/dice_rolls`, {
-      method: 'POST',
-      headers: {
-        ...supabaseHeaders(serviceKey),
-        Prefer: 'return=representation',
-      },
-      body: JSON.stringify({
-        player_name: body.playerName ?? 'Guest',
-        dice_count: diceCount,
-        results,
-        total,
-      }),
-    });
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    if (!insertRes.ok) {
-      return respond(req, res, 500, { ok: false, error: await insertRes.text() });
+    let data: DiceRollRow | null = null;
+
+    if (supabaseUrl && serviceKey) {
+      try {
+        const insertRes = await fetch(`${supabaseUrl}/rest/v1/dice_rolls`, {
+          method: 'POST',
+          headers: {
+            ...supabaseHeaders(serviceKey),
+            Prefer: 'return=representation',
+          },
+          body: JSON.stringify({
+            player_name: body.playerName ?? 'Guest',
+            dice_count: diceCount,
+            results,
+            total,
+          }),
+        });
+
+        if (insertRes.ok) {
+          const rows = (await insertRes.json()) as DiceRollRow[];
+          data = rows[0] ?? null;
+        }
+      } catch {
+        data = null;
+      }
     }
-
-    const rows = (await insertRes.json()) as DiceRollRow[];
-    const data = rows[0] ?? null;
 
     return respond(req, res, 200, {
       ok: true,
-      rollId: data?.id ?? null,
+      rollId: data?.id ?? `local-${Date.now()}`,
       createdAt: data?.created_at ?? null,
       results,
       total,
