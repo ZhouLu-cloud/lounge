@@ -3,7 +3,7 @@
   "framework": "vite",
   "functions": {
     "api/**/*.ts": {
-      "runtime": "@vercel/node"
+      "runtime": "nodejs22.x"
     }
   },
   "buildCommand": "npm run build",

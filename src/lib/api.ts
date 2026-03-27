@@ -95,16 +95,28 @@ export const loungeApi = {
   },
 
   rollDice: async (diceCount: number, playerName = 'Guest') => {
-    const data = await request<DiceRollResponse>('/api/dice-roll', {
-      method: 'POST',
-      body: JSON.stringify({ diceCount, playerName }),
-    });
+    try {
+      const data = await request<DiceRollResponse>('/api/dice-roll', {
+        method: 'POST',
+        body: JSON.stringify({ diceCount, playerName }),
+      });
 
-    return {
-      id: data.rollId,
-      results: data.results,
-      total: data.total,
-    };
+      return {
+        id: data.rollId,
+        results: data.results,
+        total: data.total,
+      };
+    } catch {
+      const safeDiceCount = Number.isInteger(diceCount) ? Math.min(Math.max(diceCount, 1), 10) : 5;
+      const localResults = Array.from({ length: safeDiceCount }, () => Math.floor(Math.random() * 6) + 1);
+      const localTotal = localResults.reduce((sum, value) => sum + value, 0);
+
+      return {
+        id: `local-${Date.now()}`,
+        results: localResults,
+        total: localTotal,
+      };
+    }
   },
 
   drawLadyCard: async (playerName = 'Guest') => {

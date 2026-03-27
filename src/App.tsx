@@ -236,9 +236,7 @@ const DiceGameView = () => {
       const result = await loungeApi.rollDice(diceCount, 'Guest');
       setResults(result.results);
       setIsRevealed(true);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to roll dice.';
-      setErrorMessage(message);
+    } catch {
       setResults(Array.from({ length: diceCount }, () => Math.floor(Math.random() * 6) + 1));
       setIsRevealed(true);
     } finally {
