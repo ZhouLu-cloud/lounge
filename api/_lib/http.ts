@@ -39,33 +39,64 @@ export function methodNotAllowed(req: ApiRequest, res: ApiResponse, allowed: str
 }
 
 export async function parseJsonBody<T = JsonRecord>(req: ApiRequest): Promise<T> {
+  const hasBuffer = typeof Buffer !== 'undefined';
+
   const directBody = (req as ApiRequestBodyCarrier).body;
 
-  if (directBody && typeof directBody === 'object' && !Buffer.isBuffer(directBody)) {
+  if (directBody && typeof directBody === 'object' && !(hasBuffer && Buffer.isBuffer(directBody))) {
     return directBody as T;
   }
 
   if (typeof directBody === 'string' && directBody.trim()) {
-    return JSON.parse(directBody) as T;
+    try {
+      return JSON.parse(directBody) as T;
+    } catch {
+      return {} as T;
+    }
   }
 
-  if (Buffer.isBuffer(directBody) && directBody.length) {
-    return JSON.parse(directBody.toString('utf8')) as T;
+  if (hasBuffer && Buffer.isBuffer(directBody) && directBody.length) {
+    try {
+      return JSON.parse(directBody.toString('utf8')) as T;
+    } catch {
+      return {} as T;
+    }
   }
 
   if (typeof req.on === 'function') {
     const raw = await new Promise<string>((resolve, reject) => {
-      const chunks: Buffer[] = [];
-      req.on?.('data', (chunk: Buffer | string) => {
-        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      const chunks: Uint8Array[] = [];
+      req.on?.('data', (chunk: any) => {
+        if (hasBuffer && Buffer.isBuffer(chunk)) {
+          chunks.push(chunk);
+        } else if (chunk instanceof Uint8Array) {
+          chunks.push(chunk);
+        } else {
+          chunks.push(new TextEncoder().encode(String(chunk)));
+        }
       });
       req.on?.('end', () => {
-        resolve(Buffer.concat(chunks).toString('utf8'));
+        const totalLength = chunks.reduce((sum, c) => sum + c.length, 0);
+        const merged = new Uint8Array(totalLength);
+        let offset = 0;
+        for (const chunk of chunks) {
+          merged.set(chunk, offset);
+          offset += chunk.length;
+        }
+        resolve(new TextDecoder().decode(merged));
       });
       req.on?.('error', (error: unknown) => reject(error));
     });
 
-    return raw.trim() ? (JSON.parse(raw) as T) : ({} as T);
+    if (!raw.trim()) {
+      return {} as T;
+    }
+
+    try {
+      return JSON.parse(raw) as T;
+    } catch {
+      return {} as T;
+    }
   }
 
   return {} as T;

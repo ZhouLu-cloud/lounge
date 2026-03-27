@@ -638,6 +638,41 @@ const PokerGameView = () => {
             <p className="text-center text-sm text-error font-medium">{errorMessage}</p>
           )}
         </div>
+
+        <AnimatePresence>
+          {showRules && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-surface/80 backdrop-blur-xl"
+            >
+              <motion.div
+                initial={{ scale: 0.95, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                className="w-full max-w-lg bg-surface-container-lowest rounded-3xl border border-surface-container-high p-8"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-headline text-2xl font-bold text-on-surface">德州扑克规则</h3>
+                  <button onClick={() => setShowRules(false)} className="w-9 h-9 rounded-full bg-surface-container-low">×</button>
+                </div>
+                <ul className="space-y-2 text-sm text-on-surface-variant leading-relaxed">
+                  <li>1. 皇家同花顺（Royal Flush）</li>
+                  <li>2. 同花顺（Straight Flush）</li>
+                  <li>3. 四条（Four of a Kind）</li>
+                  <li>4. 葫芦（Full House）</li>
+                  <li>5. 同花（Flush）</li>
+                  <li>6. 顺子（Straight）</li>
+                  <li>7. 三条（Three of a Kind）</li>
+                  <li>8. 两对（Two Pair）</li>
+                  <li>9. 一对（One Pair）</li>
+                  <li>10. 高牌（High Card）</li>
+                </ul>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
     );
   }
