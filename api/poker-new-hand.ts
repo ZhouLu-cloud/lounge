@@ -1,4 +1,5 @@
 import { buildPokerHand } from './_lib/games';
+import { handleApiError, methodNotAllowed, parseJsonBody, sendJson } from './_lib/http';
 
 type NewHandBody = {
   roomCode?: string;
@@ -28,36 +29,6 @@ type HandRow = {
   created_at: string;
 };
 
-function sendJson(res: any, statusCode: number, payload: unknown) {
-  res.statusCode = statusCode;
-  res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.end(JSON.stringify(payload));
-}
-
-function methodNotAllowed(req: any, res: any, allowed: string[]) {
-  res.setHeader('Allow', allowed.join(', '));
-  return sendJson(res, 405, {
-    ok: false,
-    error: `Method ${req.method ?? 'UNKNOWN'} not allowed`,
-  });
-}
-
-async function parseBody(req: any): Promise<NewHandBody> {
-  if (req.body && typeof req.body === 'object') {
-    return req.body as NewHandBody;
-  }
-
-  if (typeof req.body === 'string') {
-    try {
-      return JSON.parse(req.body) as NewHandBody;
-    } catch {
-      return {};
-    }
-  }
-
-  return {};
-}
-
 function supabaseHeaders(apiKey: string) {
   return {
     apikey: apiKey,
@@ -79,7 +50,7 @@ export default async function handler(req: any, res: any) {
       return sendJson(res, 500, { ok: false, error: 'Missing Supabase environment variables.' });
     }
 
-    const body = await parseBody(req);
+    const body = await parseJsonBody<NewHandBody>(req);
     const roomCode = String(body.roomCode ?? '').trim();
     const isHost = Boolean(body.isHost);
 
@@ -200,7 +171,6 @@ export default async function handler(req: any, res: any) {
       },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Internal server error';
-    return sendJson(res, 500, { ok: false, error: message });
+    return handleApiError(res, error);
   }
 }

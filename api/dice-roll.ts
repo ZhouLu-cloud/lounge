@@ -1,4 +1,5 @@
 import { randomDiceResults } from './_lib/games';
+import { handleApiError, methodNotAllowed, parseJsonBody, sendJson } from './_lib/http';
 
 type DiceRollBody = {
   diceCount?: number;
@@ -10,42 +11,12 @@ type DiceRollRow = {
   created_at: string;
 };
 
-function sendJson(res: any, statusCode: number, payload: unknown) {
-  res.statusCode = statusCode;
-  res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.end(JSON.stringify(payload));
-}
-
-function methodNotAllowed(req: any, res: any, allowed: string[]) {
-  res.setHeader('Allow', allowed.join(', '));
-  return sendJson(res, 405, {
-    ok: false,
-    error: `Method ${req.method ?? 'UNKNOWN'} not allowed`,
-  });
-}
-
 function supabaseHeaders(apiKey: string) {
   return {
     apikey: apiKey,
     Authorization: `Bearer ${apiKey}`,
     'Content-Type': 'application/json',
   };
-}
-
-async function parseBody(req: any): Promise<DiceRollBody> {
-  if (req.body && typeof req.body === 'object') {
-    return req.body as DiceRollBody;
-  }
-
-  if (typeof req.body === 'string') {
-    try {
-      return JSON.parse(req.body) as DiceRollBody;
-    } catch {
-      return {};
-    }
-  }
-
-  return {};
 }
 
 export default async function handler(req: any, res: any) {
@@ -61,7 +32,7 @@ export default async function handler(req: any, res: any) {
       return sendJson(res, 500, { ok: false, error: 'Missing Supabase environment variables.' });
     }
 
-    const body = await parseBody(req);
+    const body = await parseJsonBody<DiceRollBody>(req);
     const diceCount = Number(body.diceCount ?? 5);
 
     if (!Number.isInteger(diceCount) || diceCount < 1 || diceCount > 10) {
@@ -100,7 +71,6 @@ export default async function handler(req: any, res: any) {
       total,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Internal server error';
-    return sendJson(res, 500, { ok: false, error: message });
+    return handleApiError(res, error);
   }
 }

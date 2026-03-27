@@ -20,8 +20,16 @@ type ApiRequestBodyCarrier = {
 export type JsonRecord = Record<string, unknown>;
 
 export function sendJson(res: ApiResponse, statusCode: number, payload: unknown) {
+  if (!res) {
+    return;
+  }
+
   if (typeof res.status === 'function' && typeof res.json === 'function') {
     res.status(statusCode).json(payload);
+    return;
+  }
+
+  if (typeof res.setHeader !== 'function' || typeof res.end !== 'function') {
     return;
   }
 
@@ -63,27 +71,46 @@ export async function parseJsonBody<T = JsonRecord>(req: ApiRequest): Promise<T>
     }
   }
 
+  const requestLike = req as any;
+
+  if (typeof requestLike?.json === 'function') {
+    try {
+      const parsed = await requestLike.json();
+      if (parsed && typeof parsed === 'object') {
+        return parsed as T;
+      }
+      return {} as T;
+    } catch {
+      return {} as T;
+    }
+  }
+
   if (typeof req.on === 'function') {
     const raw = await new Promise<string>((resolve, reject) => {
-      const chunks: Uint8Array[] = [];
+      const chunks: any[] = [];
       req.on?.('data', (chunk: any) => {
-        if (hasBuffer && Buffer.isBuffer(chunk)) {
-          chunks.push(chunk);
-        } else if (chunk instanceof Uint8Array) {
-          chunks.push(chunk);
-        } else {
-          chunks.push(new TextEncoder().encode(String(chunk)));
-        }
+        chunks.push(chunk);
       });
       req.on?.('end', () => {
-        const totalLength = chunks.reduce((sum, c) => sum + c.length, 0);
-        const merged = new Uint8Array(totalLength);
-        let offset = 0;
-        for (const chunk of chunks) {
-          merged.set(chunk, offset);
-          offset += chunk.length;
-        }
-        resolve(new TextDecoder().decode(merged));
+        const rawText = chunks
+          .map((chunk) => {
+            if (typeof chunk === 'string') {
+              return chunk;
+            }
+
+            if (hasBuffer && Buffer.isBuffer(chunk)) {
+              return chunk.toString('utf8');
+            }
+
+            if (chunk instanceof Uint8Array) {
+              return String.fromCharCode(...chunk);
+            }
+
+            return String(chunk ?? '');
+          })
+          .join('');
+
+        resolve(rawText);
       });
       req.on?.('error', (error: unknown) => reject(error));
     });
