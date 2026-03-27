@@ -1,5 +1,5 @@
 import { getSupabaseAdmin } from './_lib/supabase';
-import { handleApiError, methodNotAllowed, parseJsonBody, sendJson } from './_lib/http';
+import { handleApiError, methodNotAllowed, sendJson } from './_lib/http';
 
 type JoinBody = {
   roomCode?: string;
@@ -16,7 +16,17 @@ export default async function handler(req: any, res: any) {
       return methodNotAllowed(req, res, ['POST']);
     }
 
-    const body = await parseJsonBody<JoinBody>(req);
+    let body: JoinBody = {};
+    if (req.body && typeof req.body === 'object') {
+      body = req.body as JoinBody;
+    } else if (typeof req.body === 'string') {
+      try {
+        body = JSON.parse(req.body) as JoinBody;
+      } catch {
+        body = {};
+      }
+    }
+
     const roomCode = (body.roomCode ?? '').trim();
     const createRoom = Boolean(body.createRoom);
     const requestedMaxPlayers = Number(body.maxPlayers ?? 6);
