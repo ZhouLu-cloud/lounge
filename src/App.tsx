@@ -700,16 +700,7 @@ const PokerGameView = () => {
           <h1 className="font-headline text-5xl font-extrabold tracking-tighter text-on-surface">德州扑克</h1>
         </div>
         <div className="flex flex-col items-end gap-2">
-          {isHost ? (
-            <button 
-              onClick={() => handleNewHand(roomCode)}
-              disabled={isSubmitting || !isRoomFull || isGameStarted}
-              className="px-5 py-3 bg-primary text-on-primary rounded-2xl font-headline font-bold text-xs uppercase tracking-[0.2em] disabled:opacity-50"
-              title="Start Game"
-            >
-              {isRoomFull ? (isGameStarted ? 'GAME STARTED' : 'START GAME') : 'WAIT FOR FULL ROOM'}
-            </button>
-          ) : (
+          {!isHost && (
             <button 
               onClick={() => setPlayerCardsRevealed(!playerCardsRevealed)}
               className="p-4 bg-surface-container-low rounded-2xl hover:bg-surface-container-high transition-colors"
@@ -769,7 +760,23 @@ const PokerGameView = () => {
 
         {/* Action Button */}
         <div className="z-10 mb-12">
-          {isGameStarted && revealStage < 3 ? (
+          {!isGameStarted ? (
+            isHost ? (
+              <div className="text-center">
+                <button
+                  onClick={() => handleNewHand(roomCode)}
+                  disabled={isSubmitting || !isRoomFull}
+                  className="px-8 py-4 bg-primary text-on-primary rounded-full font-headline font-bold text-sm uppercase tracking-widest shadow-xl active:scale-95 transition-all disabled:opacity-50"
+                >
+                  {isRoomFull ? (isSubmitting ? 'STARTING...' : 'START GAME') : 'WAIT FOR FULL ROOM'}
+                </button>
+              </div>
+            ) : (
+              <div className="px-8 py-4 bg-surface-container-high text-on-surface-variant rounded-full font-headline font-bold text-sm uppercase tracking-widest text-center">
+                Waiting for host to start
+              </div>
+            )
+          ) : revealStage < 3 ? (
             <button 
               onClick={handleRevealNext}
               disabled={isSubmitting || !isHost}
@@ -777,13 +784,9 @@ const PokerGameView = () => {
             >
               {revealStage === 0 ? '翻牌 (Flop)' : revealStage === 1 ? '转牌 (Turn)' : '河牌 (River)'}
             </button>
-          ) : isGameStarted ? (
+          ) : (
             <div className="px-8 py-4 bg-secondary-container text-on-secondary-container rounded-full font-headline font-bold text-sm uppercase tracking-widest">
               All Cards Revealed
-            </div>
-          ) : (
-            <div className="px-8 py-4 bg-surface-container-high text-on-surface-variant rounded-full font-headline font-bold text-sm uppercase tracking-widest">
-              Waiting for host to start
             </div>
           )}
         </div>

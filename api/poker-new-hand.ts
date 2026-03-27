@@ -1,6 +1,4 @@
 import { buildPokerHand } from './_lib/games';
-import { getSupabaseAdmin } from './_lib/supabase';
-import { handleApiError, methodNotAllowed, parseJsonBody, sendJson } from './_lib/http';
 
 type NewHandBody = {
   roomCode?: string;
@@ -10,14 +8,93 @@ type NewHandBody = {
 
 const ROOM_CODE_REGEX = /^\d{4}$/;
 
+type RoomRow = {
+  id: string;
+  room_code: string;
+  players: number;
+  max_players: number;
+  status: string;
+  game_type: string;
+};
+
+type HandRow = {
+  id: string;
+  room_code: string;
+  player_name: string;
+  player_cards: unknown;
+  all_community_cards: unknown;
+  community_cards: unknown;
+  reveal_stage: number;
+  created_at: string;
+};
+
+function sendJson(res: any, statusCode: number, payload: unknown) {
+  res.statusCode = statusCode;
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.end(JSON.stringify(payload));
+}
+
+function supabaseHeaders(apiKey: string) {
+  return {
+    apikey: apiKey,
+    Authorization: `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+  };
+}
+
+async function parseBody(req: any): Promise<NewHandBody> {
+  if (req.body && typeof req.body === 'object') {
+    return req.body as NewHandBody;
+  }
+
+  if (typeof req.body === 'string') {
+    try {
+      return JSON.parse(req.body) as NewHandBody;
+    } catch {
+      return {};
+    }
+  }
+
+  return await new Promise<NewHandBody>((resolve) => {
+    const chunks: Buffer[] = [];
+
+    req.on('data', (chunk: Buffer | string) => {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    });
+
+    req.on('end', () => {
+      const raw = Buffer.concat(chunks).toString('utf8');
+      if (!raw.trim()) {
+        resolve({});
+        return;
+      }
+      try {
+        resolve(JSON.parse(raw) as NewHandBody);
+      } catch {
+        resolve({});
+      }
+    });
+
+    req.on('error', () => resolve({}));
+  });
+}
+
 export default async function handler(req: any, res: any) {
   try {
     if (req.method !== 'POST') {
-      return methodNotAllowed(req, res, ['POST']);
+      res.setHeader('Allow', 'POST');
+      return sendJson(res, 405, { ok: false, error: 'Method not allowed.' });
     }
 
-    const body = await parseJsonBody<NewHandBody>(req);
-    const roomCode = (body.roomCode ?? '').trim();
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !serviceKey) {
+      return sendJson(res, 500, { ok: false, error: 'Missing Supabase environment variables.' });
+    }
+
+    const body = await parseBody(req);
+    const roomCode = String(body.roomCode ?? '').trim();
     const isHost = Boolean(body.isHost);
 
     if (!ROOM_CODE_REGEX.test(roomCode)) {
@@ -28,17 +105,17 @@ export default async function handler(req: any, res: any) {
       return sendJson(res, 403, { ok: false, error: 'Only host can start the game.' });
     }
 
-    const supabase = getSupabaseAdmin() as any;
+    const roomRes = await fetch(
+      `${supabaseUrl}/rest/v1/game_rooms?room_code=eq.${encodeURIComponent(roomCode)}&select=id,room_code,players,max_players,status,game_type`,
+      { headers: supabaseHeaders(serviceKey) },
+    );
 
-    const { data: room, error: roomError } = await supabase
-      .from('game_rooms')
-      .select('id, players, max_players, status, game_type')
-      .eq('room_code', roomCode)
-      .single();
-
-    if (roomError) {
-      throw roomError;
+    if (!roomRes.ok) {
+      return sendJson(res, 500, { ok: false, error: await roomRes.text() });
     }
+
+    const roomRows = (await roomRes.json()) as RoomRow[];
+    const room = roomRows[0];
 
     if (!room) {
       return sendJson(res, 404, { ok: false, error: 'Room not found.' });
@@ -53,34 +130,44 @@ export default async function handler(req: any, res: any) {
     }
 
     const hand = buildPokerHand();
-    const { data, error } = await supabase
-      .from('poker_hands')
-      .insert({
+
+    const createHandRes = await fetch(`${supabaseUrl}/rest/v1/poker_hands`, {
+      method: 'POST',
+      headers: {
+        ...supabaseHeaders(serviceKey),
+        Prefer: 'return=representation',
+      },
+      body: JSON.stringify({
         room_code: roomCode,
-        player_name: body.playerName ?? 'Guest',
+        player_name: body.playerName ?? 'Host',
         player_cards: hand.playerCards,
         all_community_cards: hand.allCommunityCards,
         community_cards: hand.communityCards,
         reveal_stage: hand.revealStage,
-      })
-      .select('id, room_code, player_name, player_cards, all_community_cards, community_cards, reveal_stage, created_at')
-      .single();
+      }),
+    });
 
-    if (error) {
-      throw error;
+    if (!createHandRes.ok) {
+      return sendJson(res, 500, { ok: false, error: await createHandRes.text() });
     }
+
+    const handRows = (await createHandRes.json()) as HandRow[];
+    const data = handRows[0];
 
     if (!data) {
-      throw new Error('Failed to create poker hand.');
+      return sendJson(res, 500, { ok: false, error: 'Failed to create poker hand.' });
     }
 
-    const { error: updateRoomError } = await supabase
-      .from('game_rooms')
-      .update({ status: 'active' })
-      .eq('id', room.id);
+    const updateRoomRes = await fetch(`${supabaseUrl}/rest/v1/game_rooms?id=eq.${encodeURIComponent(room.id)}`, {
+      method: 'PATCH',
+      headers: {
+        ...supabaseHeaders(serviceKey),
+      },
+      body: JSON.stringify({ status: 'active' }),
+    });
 
-    if (updateRoomError) {
-      throw updateRoomError;
+    if (!updateRoomRes.ok) {
+      return sendJson(res, 500, { ok: false, error: await updateRoomRes.text() });
     }
 
     return sendJson(res, 200, {
@@ -97,6 +184,7 @@ export default async function handler(req: any, res: any) {
       },
     });
   } catch (error) {
-    return handleApiError(res, error);
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    return sendJson(res, 500, { ok: false, error: message });
   }
 }
