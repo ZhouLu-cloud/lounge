@@ -41,11 +41,11 @@ export default async function handler(req: any, res: any) {
     }
 
     if (createRoom && existingRoom) {
-      return sendJson(res, 400, { ok: false, error: 'Room code already exists.' });
+      return sendJson(res, 400, { ok: false, error: 'Room code already exists. Please use another 4-digit code or switch to JOIN.' });
     }
 
     if (!createRoom && !existingRoom) {
-      return sendJson(res, 404, { ok: false, error: 'Room not found. Ask host to create the room first.' });
+      return sendJson(res, 404, { ok: false, error: 'Room not found. Host must create this room first.' });
     }
 
     if (!existingRoom && createRoom) {

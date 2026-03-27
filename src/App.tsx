@@ -512,7 +512,13 @@ const PokerGameView = () => {
       setIsJoined(true);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to create this room.';
-      setErrorMessage(message);
+
+      if (message.includes('Room code already exists')) {
+        setMode('join');
+        setErrorMessage('房间号已存在，已切换到 JOIN，请直接加入该房间。');
+      } else {
+        setErrorMessage(message);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -802,11 +808,16 @@ const PokerGameView = () => {
                 <button onClick={() => setShowRules(false)} className="w-9 h-9 rounded-full bg-surface-container-low">×</button>
               </div>
               <ul className="space-y-2 text-sm text-on-surface-variant leading-relaxed">
-                <li>1. 房主创建房间并设置人数，其他玩家输入房号加入。</li>
-                <li>2. 人数满后，房主点击 Start Game 开始发牌。</li>
-                <li>3. 每位玩家 2 张手牌，公共牌共 5 张。</li>
-                <li>4. 由庄家按轮次翻牌：Flop（3）→ Turn（1）→ River（1）。</li>
-                <li>5. 最终根据五张最佳牌型比大小决定胜负。</li>
+                <li>1. 皇家同花顺（Royal Flush）</li>
+                <li>2. 同花顺（Straight Flush）</li>
+                <li>3. 四条（Four of a Kind）</li>
+                <li>4. 葫芦（Full House）</li>
+                <li>5. 同花（Flush）</li>
+                <li>6. 顺子（Straight）</li>
+                <li>7. 三条（Three of a Kind）</li>
+                <li>8. 两对（Two Pair）</li>
+                <li>9. 一对（One Pair）</li>
+                <li>10. 高牌（High Card）</li>
               </ul>
             </motion.div>
           </motion.div>
