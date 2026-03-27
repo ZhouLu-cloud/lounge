@@ -501,6 +501,12 @@ const PokerGameView = () => {
       return;
     }
 
+    setIsJoined(true);
+    setIsHost(true);
+    setRoomPlayers(1);
+    setRoomMaxPlayers(maxPlayers);
+    setRoomStatus('waiting');
+
     try {
       setIsSubmitting(true);
       setErrorMessage('');
@@ -512,13 +518,12 @@ const PokerGameView = () => {
       setIsJoined(true);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to create this room.';
-
-      if (message.includes('Room code already exists')) {
-        setMode('join');
-        setErrorMessage('房间号已存在，已切换到 JOIN，请直接加入该房间。');
-      } else {
-        setErrorMessage(message);
-      }
+      setIsJoined(false);
+      setIsHost(false);
+      setRoomPlayers(0);
+      setRoomMaxPlayers(0);
+      setRoomStatus('waiting');
+      setErrorMessage(message);
     } finally {
       setIsSubmitting(false);
     }

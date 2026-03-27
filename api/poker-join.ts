@@ -41,7 +41,22 @@ export default async function handler(req: any, res: any) {
     }
 
     if (createRoom && existingRoom) {
-      return sendJson(res, 400, { ok: false, error: 'Room code already exists. Please use another 4-digit code or switch to JOIN.' });
+      if (existingRoom.game_type !== 'POKER') {
+        return sendJson(res, 400, { ok: false, error: 'This room code is used by another game type.' });
+      }
+
+      return sendJson(res, 200, {
+        ok: true,
+        isHost: true,
+        room: {
+          code: existingRoom.room_code,
+          name: existingRoom.name,
+          players: existingRoom.players,
+          maxPlayers: existingRoom.max_players,
+          status: existingRoom.status,
+        },
+        playerName: body.playerName ?? 'Host',
+      });
     }
 
     if (!createRoom && !existingRoom) {
