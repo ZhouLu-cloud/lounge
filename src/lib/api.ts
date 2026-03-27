@@ -24,11 +24,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const fallbackMessage = raw && !raw.trim().startsWith('<')
       ? raw
       : `Request failed: ${response.status}`;
-    throw new Error(payload?.error ?? fallbackMessage);
+    throw new Error(`[${path}] ${payload?.error ?? fallbackMessage}`);
   }
 
   if (!payload?.ok) {
-    throw new Error(payload?.error ?? 'Unexpected server response.');
+    throw new Error(`[${path}] ${payload?.error ?? 'Unexpected server response.'}`);
   }
 
   return payload as T;
