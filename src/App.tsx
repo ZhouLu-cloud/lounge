@@ -101,14 +101,24 @@ const LobbyView = ({ onSelectGame, rooms, isLoading }: { onSelectGame: (type: Ga
               <p className="text-on-surface-variant mt-1 font-medium">小姐牌</p>
             </div>
             <div className="w-12 h-12 rounded-full border border-surface-container-high flex items-center justify-center group-hover:bg-primary group-hover:text-on-primary transition-colors">
-              <span className="material-symbols-outlined text-2xl">playing_cards</span>
+              <span className="text-2xl leading-none">♥</span>
             </div>
           </div>
           <div className="flex-1 flex items-center justify-center py-8">
             <div className="relative w-40 h-56 bg-surface-container-low rounded-xl flex items-center justify-center border border-surface-container-high shadow-sm">
-              <span className="text-7xl text-secondary/25">♥</span>
+              <div className="absolute top-4 left-4 flex flex-col items-center leading-none text-error">
+                <span className="font-headline text-2xl font-black">2</span>
+                <span className="text-xl">♥</span>
+              </div>
+              <div className="absolute bottom-4 right-4 flex flex-col items-center leading-none rotate-180 text-error">
+                <span className="font-headline text-2xl font-black">2</span>
+                <span className="text-xl">♥</span>
+              </div>
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className="font-headline text-5xl font-extrabold text-primary/30">Q</span>
+                <div className="relative flex items-center justify-center">
+                  <span className="text-7xl text-error/80">♥</span>
+                  <span className="absolute text-4xl text-error/40 -translate-y-1">♥</span>
+                </div>
               </div>
             </div>
           </div>
@@ -307,7 +317,7 @@ const DiceGameView = () => {
 
                         return (
                           <div key={cellIndex} className="flex items-center justify-center">
-                            <div className={`rounded-full transition-all ${isActive ? 'w-2.5 h-2.5 sm:w-3 sm:h-3 bg-primary' : 'w-1.5 h-1.5 sm:w-2 sm:h-2 bg-transparent'}`} />
+                            <div className={`rounded-full transition-all ${isActive ? `w-2.5 h-2.5 sm:w-3 sm:h-3 ${val === 1 ? 'bg-error' : 'bg-primary'}` : 'w-1.5 h-1.5 sm:w-2 sm:h-2 bg-transparent'}`} />
                           </div>
                         );
                       })}
