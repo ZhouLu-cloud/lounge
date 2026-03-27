@@ -10,7 +10,7 @@ import {
   ArrowRight,
   RotateCcw
 } from 'lucide-react';
-import { GameType, GameRoom, LadyCard, PokerCard } from './types';
+import { GameType, GameRoom, PokerCard } from './types';
 import { ROOMS } from './constants';
 import { loungeApi } from './lib/api';
 
@@ -224,7 +224,7 @@ const DiceGameView = () => {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to roll dice.';
       setErrorMessage(message);
-      setResults(Array.from({ length: diceCount }, () => 1));
+      setResults(Array.from({ length: diceCount }, () => Math.floor(Math.random() * 6) + 1));
       setIsRevealed(true);
     } finally {
       setIsShaking(false);
@@ -721,74 +721,38 @@ const PokerGameView = () => {
 };
 
 const LadyCardsView = () => {
-  const CARD_RULES: Record<string, { name: string, rule: string, icon: string }> = {
-    'A': { name: 'Ace', rule: '选人喝酒', icon: 'person_add' },
-    '2': { name: '2', rule: '是小姐', icon: 'woman' },
-    '3': { name: '3', rule: '逛三园', icon: 'park' },
-    '4': { name: '4', rule: '南北大战', icon: 'groups' },
-    '5': { name: '5', rule: '照相机', icon: 'photo_camera' },
-    '6': { name: '6', rule: '摸鼻子', icon: 'face' },
-    '7': { name: '7', rule: '逢七过', icon: 'filter_7' },
-    '8': { name: '8', rule: '厕所牌', icon: 'wc' },
-    '9': { name: '9', rule: '自己喝酒', icon: 'local_bar' },
-    '10': { name: '10', rule: '神经病', icon: 'psychology' },
-    'J': { name: 'Jack', rule: '左边喝', icon: 'arrow_back' },
-    'Q': { name: 'Queen', rule: '右边喝', icon: 'arrow_forward' },
-    'K': { name: 'King', rule: '自己定', icon: 'edit' },
-    'LJ': { name: 'Little Joker', rule: '自己喝酒', icon: 'local_bar' },
-    'BJ': { name: 'Big Joker', rule: 'Hard mode: 逢七过×2', icon: 'filter_7' },
+  type SuitColor = 'text-error' | 'text-on-surface';
+  type DeckCard = {
+    v: string;
+    symbol: string;
+    color: SuitColor;
   };
 
-  const SUITS: Array<{ name: string; icon: string; color: 'text-error' | 'text-on-surface' }> = [
-    { name: 'Hearts', icon: 'favorite', color: 'text-error' },
-    { name: 'Spades', icon: 'playing_cards', color: 'text-on-surface' },
-    { name: 'Diamonds', icon: 'diamond', color: 'text-error' },
-    { name: 'Clubs', icon: 'filter_vintage', color: 'text-on-surface' },
+  const suits: Array<{ symbol: string; color: SuitColor }> = [
+    { symbol: '♥', color: 'text-error' },
+    { symbol: '♠', color: 'text-on-surface' },
+    { symbol: '♦', color: 'text-error' },
+    { symbol: '♣', color: 'text-on-surface' },
   ];
 
-  interface LadyCardInDeck {
-    v: string;
-    s: { name: string; icon: string; color: 'text-error' | 'text-on-surface' };
-    rule: string;
-    icon: string;
-    name: string;
-  }
+  const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
-  const buildDeck = (): LadyCardInDeck[] => {
-    const deck: LadyCardInDeck[] = [];
-    const values = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+  const buildDeck = (): DeckCard[] => {
+    const deck: DeckCard[] = [];
 
-    // Add 52 cards (4 suits × 13 values)
-    for (const suit of SUITS) {
-      for (const v of values) {
+    for (const suit of suits) {
+      for (const value of values) {
         deck.push({
-          v,
-          s: suit,
-          rule: CARD_RULES[v].rule,
-          icon: CARD_RULES[v].icon,
-          name: `${CARD_RULES[v].name} of ${suit.name}`,
+          v: value,
+          symbol: suit.symbol,
+          color: suit.color,
         });
       }
     }
 
-    // Add Jokers (小王 and 大王)
-    deck.push({
-      v: 'LJ',
-      s: SUITS[0],
-      rule: CARD_RULES['LJ'].rule,
-      icon: CARD_RULES['LJ'].icon,
-      name: 'Little Joker',
-    });
+    deck.push({ v: '★', symbol: '🃏', color: 'text-on-surface' });
+    deck.push({ v: '★★', symbol: '🃏', color: 'text-error' });
 
-    deck.push({
-      v: 'BJ',
-      s: SUITS[0],
-      rule: CARD_RULES['BJ'].rule,
-      icon: CARD_RULES['BJ'].icon,
-      name: 'Big Joker',
-    });
-
-    // Shuffle deck
     for (let i = deck.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [deck[i], deck[j]] = [deck[j], deck[i]];
@@ -797,11 +761,10 @@ const LadyCardsView = () => {
     return deck;
   };
 
-  const [deck, setDeck] = useState<LadyCardInDeck[]>(buildDeck);
+  const [deck, setDeck] = useState<DeckCard[]>(buildDeck);
   const [drawnIndices, setDrawnIndices] = useState<Set<number>>(new Set());
-  const [currentCard, setCurrentCard] = useState<LadyCardInDeck>(deck[0]);
+  const [currentCard, setCurrentCard] = useState<DeckCard>(deck[0]);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [showRules, setShowRules] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
   const remainingCount = deck.length - drawnIndices.size;
@@ -809,7 +772,7 @@ const LadyCardsView = () => {
 
   const drawCard = () => {
     if (isDeckEmpty) {
-      setErrorMessage('All cards drawn! Reshuffle to continue.');
+      setErrorMessage('All cards drawn.');
       return;
     }
 
@@ -817,7 +780,6 @@ const LadyCardsView = () => {
     setErrorMessage('');
 
     setTimeout(() => {
-      // Find random undrawn card
       let randomIdx: number;
       do {
         randomIdx = Math.floor(Math.random() * deck.length);
@@ -826,7 +788,7 @@ const LadyCardsView = () => {
       setDrawnIndices((prev) => new Set([...prev, randomIdx]));
       setCurrentCard(deck[randomIdx]);
       setIsDrawing(false);
-    }, 500);
+    }, 450);
   };
 
   const reshuffle = () => {
@@ -838,152 +800,55 @@ const LadyCardsView = () => {
   };
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className="max-w-5xl mx-auto px-6 pt-12 pb-32 flex flex-col items-center"
     >
-      <div className="mb-12 flex flex-col items-center">
-        <span className="px-5 py-2 bg-secondary-container/60 backdrop-blur-md rounded-full text-[11px] font-bold uppercase tracking-[0.2em] text-on-secondary-container">
-          Card Draw Session
-        </span>
-        <p className="mt-4 font-headline text-2xl font-bold text-on-surface">小姐牌</p>
-        <p className="mt-2 text-sm text-on-surface-variant font-medium">
-          {isDeckEmpty ? (
-            <span className="text-error">All 54 cards drawn!</span>
-          ) : (
-            <span>{remainingCount} cards remaining</span>
-          )}
-        </p>
-      </div>
+      <div className="mb-8 text-sm font-medium text-on-surface-variant">{remainingCount}/54</div>
 
-      <motion.div 
-        animate={isDrawing ? { rotateY: 180, scale: 0.9, opacity: 0.5 } : { rotateY: 0, scale: 1, opacity: 1 }}
-        transition={{ type: "spring", stiffness: 260, damping: 20 }}
-        className="relative w-full max-w-[340px] aspect-[2/3] bg-white rounded-[2.5rem] editorial-shadow flex flex-col items-center justify-between p-12 border border-surface-container-high overflow-hidden"
+      <motion.div
+        animate={isDrawing ? { rotateY: 180, scale: 0.92, opacity: 0.7 } : { rotateY: 0, scale: 1, opacity: 1 }}
+        transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+        className="relative w-full max-w-[340px] aspect-[2/3] bg-white rounded-[2.5rem] editorial-shadow border border-surface-container-high overflow-hidden"
       >
-        {/* Card Corners */}
-        <div className="absolute top-10 left-10 flex flex-col items-center leading-none">
-          <span className={`font-headline text-4xl font-black ${currentCard.s.color}`}>{currentCard.v}</span>
-          <span className={`material-symbols-outlined text-2xl ${currentCard.s.color}`} style={{ fontVariationSettings: "'FILL' 1" }}>{currentCard.s.icon}</span>
-        </div>
-        <div className="absolute bottom-10 right-10 flex flex-col items-center leading-none rotate-180">
-          <span className={`font-headline text-4xl font-black ${currentCard.s.color}`}>{currentCard.v}</span>
-          <span className={`material-symbols-outlined text-2xl ${currentCard.s.color}`} style={{ fontVariationSettings: "'FILL' 1" }}>{currentCard.s.icon}</span>
+        <div className="absolute top-8 left-8 flex flex-col items-center leading-none">
+          <span className={`font-headline text-4xl font-black ${currentCard.color}`}>{currentCard.v}</span>
+          <span className={`text-2xl ${currentCard.color}`}>{currentCard.symbol}</span>
         </div>
 
-        {/* Central Icon */}
-        <div className="mt-12 w-40 h-40 flex items-center justify-center rounded-full bg-surface-container-low border border-surface-container-high relative">
-          <div className="absolute inset-0 rounded-full border-4 border-dashed border-surface-container-highest opacity-20 animate-[spin_20s_linear_infinite]"></div>
-          <span className={`material-symbols-outlined text-7xl ${currentCard.s.color}`} style={{ fontVariationSettings: "'wght' 200" }}>
-            {currentCard.icon}
-          </span>
+        <div className="absolute bottom-8 right-8 flex flex-col items-center leading-none rotate-180">
+          <span className={`font-headline text-4xl font-black ${currentCard.color}`}>{currentCard.v}</span>
+          <span className={`text-2xl ${currentCard.color}`}>{currentCard.symbol}</span>
         </div>
 
-        {/* Rule Display */}
-        <div className="text-center z-10 w-full">
-          <h2 className="font-headline text-3xl font-extrabold tracking-tight text-on-surface mb-2">{currentCard.name}</h2>
-          <div className="w-12 h-1 bg-primary/20 mx-auto mb-6 rounded-full"></div>
-          <div className="bg-surface-container-lowest py-4 px-6 rounded-2xl border border-surface-container-high">
-            <p className="font-headline text-xl font-bold text-primary">
-              {currentCard.rule}
-            </p>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="relative w-44 h-44 rounded-full border border-surface-container-high bg-surface-container-low flex flex-col items-center justify-center">
+            <div className="absolute inset-3 rounded-full border border-dashed border-surface-container-highest opacity-40" />
+            <span className={`font-headline text-8xl font-black leading-none ${currentCard.color}`}>{currentCard.v}</span>
+            <span className={`text-6xl leading-none ${currentCard.color}`}>{currentCard.symbol}</span>
           </div>
         </div>
-              {/* Central Icon - Value and Suit */}
-              <div className="mt-12 flex flex-col items-center justify-center gap-6 z-10">
-                <span className={`font-headline text-8xl font-black ${currentCard.s.color}`}>
-                  {currentCard.v}
-                </span>
-                <span className={`material-symbols-outlined text-7xl ${currentCard.s.color}`} style={{ fontVariationSettings: "'FILL' 1" }}>
-                  {currentCard.s.icon}
-                </span>
-              </div>
-
-              {/* Rule Display */}
-              <div>
-              </div>
       </motion.div>
 
-      <div className="mt-16 w-full max-w-[340px] flex flex-col gap-4">
-        <button 
+      <div className="mt-12 w-full max-w-[340px] flex flex-col gap-4">
+        <button
           onClick={drawCard}
           disabled={isDrawing || isDeckEmpty}
           className="w-full py-6 bg-primary text-on-primary font-headline font-bold rounded-2xl active:scale-[0.98] transition-all shadow-xl text-lg disabled:opacity-50"
         >
-          {isDrawing ? 'Drawing...' : isDeckEmpty ? 'Deck Empty' : 'Draw Next Card'}
+          {isDrawing ? 'Drawing...' : isDeckEmpty ? 'Deck Empty' : 'Draw'}
         </button>
         {isDeckEmpty && (
-          <button 
+          <button
             onClick={reshuffle}
             className="w-full py-6 bg-secondary text-on-secondary font-headline font-bold rounded-2xl active:scale-[0.98] transition-all shadow-xl text-lg"
           >
-            Reshuffle (54 Cards)
+            Reshuffle
           </button>
         )}
-        <button 
-          onClick={() => setShowRules(true)}
-          className="w-full py-5 bg-surface-container-low text-on-surface-variant font-headline font-bold rounded-2xl hover:bg-surface-container-high transition-colors text-sm uppercase tracking-widest"
-        >
-          View Rules
-        </button>
-        {errorMessage && (
-          <p className="text-center text-sm text-error font-medium">{errorMessage}</p>
-        )}
+        {errorMessage && <p className="text-center text-sm text-error font-medium">{errorMessage}</p>}
       </div>
-
-      {/* Rules Modal */}
-      <AnimatePresence>
-        {showRules && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-surface/80 backdrop-blur-xl"
-          >
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="w-full max-w-lg bg-surface-container-lowest rounded-[2.5rem] editorial-shadow border border-surface-container-high overflow-hidden flex flex-col max-h-[80vh]"
-            >
-              <div className="p-8 border-b border-surface-container-high flex justify-between items-center">
-                <h3 className="font-headline text-2xl font-bold text-on-surface">Game Rules</h3>
-                <button 
-                  onClick={() => setShowRules(false)}
-                  className="w-10 h-10 rounded-full bg-surface-container-low flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high transition-colors"
-                >
-                  <span className="material-symbols-outlined">close</span>
-                </button>
-              </div>
-              <div className="flex-1 overflow-y-auto p-8">
-                <div className="grid grid-cols-1 gap-4">
-                  {Object.entries(CARD_RULES).map(([key, value]) => (
-                    <div key={key} className="flex items-center gap-6 p-4 rounded-2xl bg-surface-container-low border border-surface-container-high">
-                      <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary font-headline text-xl font-black">
-                        {key}
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-headline font-bold text-on-surface">{value.name}</p>
-                        <p className="text-sm text-on-surface-variant">{value.rule}</p>
-                      </div>
-                      <span className="material-symbols-outlined text-on-surface-variant/30">{value.icon}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="p-8 bg-surface-container-low border-t border-surface-container-high">
-                <button 
-                  onClick={() => setShowRules(false)}
-                  className="w-full py-4 bg-on-surface text-surface rounded-2xl font-headline font-bold text-sm uppercase tracking-widest"
-                >
-                  Got it
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </motion.div>
   );
 };
