@@ -106,7 +106,7 @@ const LobbyView = ({ onSelectGame, rooms, isLoading }: { onSelectGame: (type: Ga
           </div>
           <div className="flex-1 flex items-center justify-center py-8">
             <div className="relative w-40 h-56 bg-surface-container-low rounded-xl flex items-center justify-center border border-surface-container-high shadow-sm">
-              <span className="material-symbols-outlined text-7xl text-secondary/20">style</span>
+              <span className="text-7xl text-secondary/25">♥</span>
               <div className="absolute inset-0 flex items-center justify-center">
                 <span className="font-headline text-5xl font-extrabold text-primary/30">Q</span>
               </div>
@@ -130,7 +130,7 @@ const LobbyView = ({ onSelectGame, rooms, isLoading }: { onSelectGame: (type: Ga
           >
             <div className="flex justify-between items-start">
               <div className="w-10 h-10 rounded-xl bg-secondary-container/30 flex items-center justify-center">
-                <span className="material-symbols-outlined text-secondary">casino</span>
+                <span className="text-secondary text-lg leading-none">⚄</span>
               </div>
               <ChevronRight className="text-outline group-hover:text-primary transition-colors" size={20} />
             </div>
@@ -155,7 +155,7 @@ const LobbyView = ({ onSelectGame, rooms, isLoading }: { onSelectGame: (type: Ga
           >
             <div className="flex justify-between items-start">
               <div className="w-10 h-10 rounded-xl bg-surface-container-high flex items-center justify-center">
-                <span className="material-symbols-outlined text-primary">style</span>
+                <span className="text-primary text-lg leading-none">♠</span>
               </div>
               <ChevronRight className="text-outline group-hover:text-primary transition-colors" size={20} />
             </div>
@@ -542,7 +542,7 @@ const PokerGameView = () => {
             <div className="bg-surface-container-low rounded-2xl p-4 border border-surface-container-high">
               <p className="text-xs font-bold tracking-[0.2em] text-outline uppercase mb-3">Players</p>
               <div className="grid grid-cols-4 gap-2">
-                {[2, 4, 6, 8].map((count) => (
+                {[2, 3, 4, 5, 6, 7, 8, 9, 10].map((count) => (
                   <button
                     key={count}
                     onClick={() => setMaxPlayers(count)}

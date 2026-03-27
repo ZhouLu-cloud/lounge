@@ -25,8 +25,8 @@ export default async function handler(req: any, res: any) {
       return sendJson(res, 400, { ok: false, error: 'roomCode must be 4 digits.' });
     }
 
-    if (createRoom && (!Number.isInteger(requestedMaxPlayers) || requestedMaxPlayers < 2 || requestedMaxPlayers > 9)) {
-      return sendJson(res, 400, { ok: false, error: 'maxPlayers must be an integer between 2 and 9.' });
+    if (createRoom && (!Number.isInteger(requestedMaxPlayers) || requestedMaxPlayers < 2 || requestedMaxPlayers > 10)) {
+      return sendJson(res, 400, { ok: false, error: 'maxPlayers must be an integer between 2 and 10.' });
     }
 
     const supabase = getSupabaseAdmin() as any;
