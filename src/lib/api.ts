@@ -11,10 +11,24 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     ...init,
   });
 
-  const payload = await response.json();
+  const raw = await response.text();
+  let payload: any = null;
 
-  if (!response.ok || !payload?.ok) {
-    throw new Error(payload?.error ?? `Request failed: ${response.status}`);
+  try {
+    payload = raw ? JSON.parse(raw) : null;
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok) {
+    const fallbackMessage = raw && !raw.trim().startsWith('<')
+      ? raw
+      : `Request failed: ${response.status}`;
+    throw new Error(payload?.error ?? fallbackMessage);
+  }
+
+  if (!payload?.ok) {
+    throw new Error(payload?.error ?? 'Unexpected server response.');
   }
 
   return payload as T;

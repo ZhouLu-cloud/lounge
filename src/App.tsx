@@ -226,6 +226,10 @@ const DiceGameView = () => {
     setIsShaking(true);
     setErrorMessage('');
 
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      navigator.vibrate([120, 60, 120]);
+    }
+
     try {
       await new Promise((resolve) => setTimeout(resolve, 600));
       const result = await loungeApi.rollDice(diceCount, 'Guest');
