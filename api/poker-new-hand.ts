@@ -1,4 +1,5 @@
 import { buildPokerHand } from './_lib/games';
+import { handleApiError, methodNotAllowed, parseJsonBody, sendJson } from './_lib/http';
 
 type NewHandBody = {
   roomCode?: string;
@@ -28,12 +29,6 @@ type HandRow = {
   created_at: string;
 };
 
-function sendJson(res: any, statusCode: number, payload: unknown) {
-  res.statusCode = statusCode;
-  res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.end(JSON.stringify(payload));
-}
-
 function supabaseHeaders(apiKey: string) {
   return {
     apikey: apiKey,
@@ -42,48 +37,10 @@ function supabaseHeaders(apiKey: string) {
   };
 }
 
-async function parseBody(req: any): Promise<NewHandBody> {
-  if (req.body && typeof req.body === 'object') {
-    return req.body as NewHandBody;
-  }
-
-  if (typeof req.body === 'string') {
-    try {
-      return JSON.parse(req.body) as NewHandBody;
-    } catch {
-      return {};
-    }
-  }
-
-  return await new Promise<NewHandBody>((resolve) => {
-    const chunks: Buffer[] = [];
-
-    req.on('data', (chunk: Buffer | string) => {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-    });
-
-    req.on('end', () => {
-      const raw = Buffer.concat(chunks).toString('utf8');
-      if (!raw.trim()) {
-        resolve({});
-        return;
-      }
-      try {
-        resolve(JSON.parse(raw) as NewHandBody);
-      } catch {
-        resolve({});
-      }
-    });
-
-    req.on('error', () => resolve({}));
-  });
-}
-
 export default async function handler(req: any, res: any) {
   try {
     if (req.method !== 'POST') {
-      res.setHeader('Allow', 'POST');
-      return sendJson(res, 405, { ok: false, error: 'Method not allowed.' });
+      return methodNotAllowed(req, res, ['POST']);
     }
 
     const supabaseUrl = process.env.SUPABASE_URL;
@@ -93,7 +50,7 @@ export default async function handler(req: any, res: any) {
       return sendJson(res, 500, { ok: false, error: 'Missing Supabase environment variables.' });
     }
 
-    const body = await parseBody(req);
+    const body = await parseJsonBody<NewHandBody>(req);
     const roomCode = String(body.roomCode ?? '').trim();
     const isHost = Boolean(body.isHost);
 
@@ -127,6 +84,36 @@ export default async function handler(req: any, res: any) {
 
     if (room.players < room.max_players) {
       return sendJson(res, 400, { ok: false, error: 'Room is not full yet.' });
+    }
+
+    if (room.status === 'active') {
+      const activeHandRes = await fetch(
+        `${supabaseUrl}/rest/v1/poker_hands?room_code=eq.${encodeURIComponent(roomCode)}&select=id,room_code,player_name,player_cards,all_community_cards,community_cards,reveal_stage,created_at&order=created_at.desc&limit=1`,
+        { headers: supabaseHeaders(serviceKey) },
+      );
+
+      if (!activeHandRes.ok) {
+        return sendJson(res, 500, { ok: false, error: await activeHandRes.text() });
+      }
+
+      const activeRows = (await activeHandRes.json()) as HandRow[];
+      const activeHand = activeRows[0];
+
+      if (activeHand) {
+        return sendJson(res, 200, {
+          ok: true,
+          hand: {
+            id: activeHand.id,
+            roomCode: activeHand.room_code,
+            playerName: activeHand.player_name,
+            playerCards: activeHand.player_cards,
+            allCommunityCards: activeHand.all_community_cards,
+            communityCards: activeHand.community_cards,
+            revealStage: activeHand.reveal_stage,
+            createdAt: activeHand.created_at,
+          },
+        });
+      }
     }
 
     const hand = buildPokerHand();
@@ -184,7 +171,6 @@ export default async function handler(req: any, res: any) {
       },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Internal server error';
-    return sendJson(res, 500, { ok: false, error: message });
+    return handleApiError(res, error);
   }
 }
