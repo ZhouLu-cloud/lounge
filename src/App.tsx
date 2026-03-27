@@ -219,6 +219,7 @@ const DiceGameView = () => {
   const [isShaking, setIsShaking] = useState(false);
   const [isRevealed, setIsRevealed] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [showRules, setShowRules] = useState(false);
 
   const [isPeeking, setIsPeeking] = useState(false);
 
@@ -382,7 +383,43 @@ const DiceGameView = () => {
             </button>
           </div>
         </div>
+
+        <button
+          onClick={() => setShowRules(true)}
+          className="w-full py-4 bg-surface-container-low text-on-surface-variant font-headline font-bold rounded-2xl hover:bg-surface-container-high transition-colors text-sm uppercase tracking-widest"
+        >
+          查看规则
+        </button>
       </div>
+
+      <AnimatePresence>
+        {showRules && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-surface/80 backdrop-blur-xl"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="w-full max-w-lg bg-surface-container-lowest rounded-3xl border border-surface-container-high p-8"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-headline text-2xl font-bold text-on-surface">摇骰子规则</h3>
+                <button onClick={() => setShowRules(false)} className="w-9 h-9 rounded-full bg-surface-container-low">×</button>
+              </div>
+              <ul className="space-y-2 text-sm text-on-surface-variant leading-relaxed">
+                <li>1. 选择骰子数量（1-10）。</li>
+                <li>2. 点击 Shake Cup 摇骰子并生成随机点数。</li>
+                <li>3. 可按住 Hold to Peek 临时查看，或 Reveal All 全部展示。</li>
+                <li>4. 通常比拼点数、猜点或按你们自定义惩罚规则进行。</li>
+              </ul>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };
@@ -403,6 +440,7 @@ const PokerGameView = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [playerCardsRevealed, setPlayerCardsRevealed] = useState(false);
+  const [showRules, setShowRules] = useState(false);
 
   const isRoomFull = roomPlayers >= roomMaxPlayers && roomMaxPlayers > 0;
   const isGameStarted = roomStatus === 'active' && !!handId;
@@ -584,6 +622,12 @@ const PokerGameView = () => {
           >
             {isSubmitting ? (mode === 'create' ? 'CREATING...' : 'JOINING...') : (mode === 'create' ? 'CREATE ROOM' : 'JOIN TABLE')}
           </button>
+          <button
+            onClick={() => setShowRules(true)}
+            className="w-full py-4 bg-surface-container-low text-on-surface-variant font-headline font-bold rounded-2xl hover:bg-surface-container-high transition-colors text-sm uppercase tracking-widest"
+          >
+            查看规则
+          </button>
           {errorMessage && (
             <p className="text-center text-sm text-error font-medium">{errorMessage}</p>
           )}
@@ -609,24 +653,32 @@ const PokerGameView = () => {
           </div>
           <h1 className="font-headline text-5xl font-extrabold tracking-tighter text-on-surface">德州扑克</h1>
         </div>
-        {isHost ? (
-          <button 
-            onClick={() => handleNewHand(roomCode)}
-            disabled={isSubmitting || !isRoomFull || isGameStarted}
-            className="px-5 py-3 bg-primary text-on-primary rounded-2xl font-headline font-bold text-xs uppercase tracking-[0.2em] disabled:opacity-50"
-            title="Start Game"
+        <div className="flex flex-col items-end gap-2">
+          {isHost ? (
+            <button 
+              onClick={() => handleNewHand(roomCode)}
+              disabled={isSubmitting || !isRoomFull || isGameStarted}
+              className="px-5 py-3 bg-primary text-on-primary rounded-2xl font-headline font-bold text-xs uppercase tracking-[0.2em] disabled:opacity-50"
+              title="Start Game"
+            >
+              {isRoomFull ? (isGameStarted ? 'GAME STARTED' : 'START GAME') : 'WAIT FOR FULL ROOM'}
+            </button>
+          ) : (
+            <button 
+              onClick={() => setPlayerCardsRevealed(!playerCardsRevealed)}
+              className="p-4 bg-surface-container-low rounded-2xl hover:bg-surface-container-high transition-colors"
+              title="Toggle My Cards"
+            >
+              <RotateCcw size={20} />
+            </button>
+          )}
+          <button
+            onClick={() => setShowRules(true)}
+            className="px-5 py-3 bg-surface-container-low text-on-surface-variant rounded-2xl font-headline font-bold text-xs uppercase tracking-[0.2em] hover:bg-surface-container-high transition-colors"
           >
-            {isRoomFull ? (isGameStarted ? 'GAME STARTED' : 'START GAME') : 'WAIT FOR FULL ROOM'}
+            查看规则
           </button>
-        ) : (
-          <button 
-            onClick={() => setPlayerCardsRevealed(!playerCardsRevealed)}
-            className="p-4 bg-surface-container-low rounded-2xl hover:bg-surface-container-high transition-colors"
-            title="Toggle My Cards"
-          >
-            <RotateCcw size={20} />
-          </button>
-        )}
+        </div>
       </div>
 
       {!isGameStarted && (
@@ -730,6 +782,36 @@ const PokerGameView = () => {
           Raise
         </button>
       </div>
+
+      <AnimatePresence>
+        {showRules && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-surface/80 backdrop-blur-xl"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="w-full max-w-lg bg-surface-container-lowest rounded-3xl border border-surface-container-high p-8"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-headline text-2xl font-bold text-on-surface">德州扑克规则</h3>
+                <button onClick={() => setShowRules(false)} className="w-9 h-9 rounded-full bg-surface-container-low">×</button>
+              </div>
+              <ul className="space-y-2 text-sm text-on-surface-variant leading-relaxed">
+                <li>1. 房主创建房间并设置人数，其他玩家输入房号加入。</li>
+                <li>2. 人数满后，房主点击 Start Game 开始发牌。</li>
+                <li>3. 每位玩家 2 张手牌，公共牌共 5 张。</li>
+                <li>4. 由庄家按轮次翻牌：Flop（3）→ Turn（1）→ River（1）。</li>
+                <li>5. 最终根据五张最佳牌型比大小决定胜负。</li>
+              </ul>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };
@@ -780,6 +862,23 @@ const LadyCardsView = () => {
   const [currentCard, setCurrentCard] = useState<DeckCard>(deck[0]);
   const [isDrawing, setIsDrawing] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [showRules, setShowRules] = useState(false);
+
+  const ladyCardRules: Array<{ key: string; rule: string }> = [
+    { key: 'A', rule: '选人喝酒' },
+    { key: '2', rule: '是小姐' },
+    { key: '3', rule: '逛三园' },
+    { key: '4', rule: '南北大战' },
+    { key: '5', rule: '照相机' },
+    { key: '6', rule: '摸鼻子' },
+    { key: '7', rule: '逢七过' },
+    { key: '8', rule: '厕所牌' },
+    { key: '9', rule: '自己喝酒' },
+    { key: '10', rule: '神经病' },
+    { key: 'J', rule: '左边喝' },
+    { key: 'Q', rule: '右边喝' },
+    { key: 'K', rule: '自己定' },
+  ];
 
   const remainingCount = deck.length - drawnIndices.size;
   const isDeckEmpty = remainingCount === 0;
@@ -861,8 +960,45 @@ const LadyCardsView = () => {
             Reshuffle
           </button>
         )}
+        <button
+          onClick={() => setShowRules(true)}
+          className="w-full py-4 bg-surface-container-low text-on-surface-variant font-headline font-bold rounded-2xl hover:bg-surface-container-high transition-colors text-sm uppercase tracking-widest"
+        >
+          查看规则
+        </button>
         {errorMessage && <p className="text-center text-sm text-error font-medium">{errorMessage}</p>}
       </div>
+
+      <AnimatePresence>
+        {showRules && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-surface/80 backdrop-blur-xl"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="w-full max-w-lg bg-surface-container-lowest rounded-3xl border border-surface-container-high p-8"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-headline text-2xl font-bold text-on-surface">小姐牌规则</h3>
+                <button onClick={() => setShowRules(false)} className="w-9 h-9 rounded-full bg-surface-container-low">×</button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {ladyCardRules.map((item) => (
+                  <div key={item.key} className="rounded-xl bg-surface-container-low border border-surface-container-high px-4 py-3 flex items-center justify-between">
+                    <span className="font-headline font-black text-on-surface">{item.key}</span>
+                    <span className="text-sm text-on-surface-variant">{item.rule}</span>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };
