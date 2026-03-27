@@ -1,9 +1,51 @@
-import { getSupabaseAdmin } from './_lib/supabase';
-import { handleApiError, methodNotAllowed, parseJsonBody, sendJson } from './_lib/http';
-
 type RevealBody = {
   handId?: string;
 };
+
+type HandRow = {
+  id: string;
+  reveal_stage: number;
+  all_community_cards: unknown;
+  community_cards: unknown;
+};
+
+function sendJson(res: any, statusCode: number, payload: unknown) {
+  res.statusCode = statusCode;
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.end(JSON.stringify(payload));
+}
+
+function methodNotAllowed(req: any, res: any, allowed: string[]) {
+  res.setHeader('Allow', allowed.join(', '));
+  return sendJson(res, 405, {
+    ok: false,
+    error: `Method ${req.method ?? 'UNKNOWN'} not allowed`,
+  });
+}
+
+function supabaseHeaders(apiKey: string) {
+  return {
+    apikey: apiKey,
+    Authorization: `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+  };
+}
+
+async function parseBody(req: any): Promise<RevealBody> {
+  if (req.body && typeof req.body === 'object') {
+    return req.body as RevealBody;
+  }
+
+  if (typeof req.body === 'string') {
+    try {
+      return JSON.parse(req.body) as RevealBody;
+    } catch {
+      return {};
+    }
+  }
+
+  return {};
+}
 
 export default async function handler(req: any, res: any) {
   try {
@@ -11,22 +53,30 @@ export default async function handler(req: any, res: any) {
       return methodNotAllowed(req, res, ['POST']);
     }
 
-    const body = await parseJsonBody<RevealBody>(req);
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !serviceKey) {
+      return sendJson(res, 500, { ok: false, error: 'Missing Supabase environment variables.' });
+    }
+
+    const body = await parseBody(req);
 
     if (!body.handId) {
       return sendJson(res, 400, { ok: false, error: 'handId is required.' });
     }
 
-    const supabase = getSupabaseAdmin() as any;
-    const { data: hand, error: fetchError } = await supabase
-      .from('poker_hands')
-      .select('id, reveal_stage, all_community_cards')
-      .eq('id', body.handId)
-      .single();
+    const fetchHandRes = await fetch(
+      `${supabaseUrl}/rest/v1/poker_hands?id=eq.${encodeURIComponent(body.handId)}&select=id,reveal_stage,all_community_cards,community_cards`,
+      { headers: supabaseHeaders(serviceKey) },
+    );
 
-    if (fetchError) {
-      throw fetchError;
+    if (!fetchHandRes.ok) {
+      return sendJson(res, 500, { ok: false, error: await fetchHandRes.text() });
     }
+
+    const handRows = (await fetchHandRes.json()) as HandRow[];
+    const hand = handRows[0];
 
     if (!hand) {
       return sendJson(res, 404, { ok: false, error: 'Hand not found.' });
@@ -39,22 +89,27 @@ export default async function handler(req: any, res: any) {
     const revealCount = nextStage === 1 ? 3 : nextStage === 2 ? 4 : 5;
     const communityCards = allCommunityCards.slice(0, revealCount);
 
-    const { data: updatedHand, error: updateError } = await supabase
-      .from('poker_hands')
-      .update({
+    const updateHandRes = await fetch(`${supabaseUrl}/rest/v1/poker_hands?id=eq.${encodeURIComponent(body.handId)}`, {
+      method: 'PATCH',
+      headers: {
+        ...supabaseHeaders(serviceKey),
+        Prefer: 'return=representation',
+      },
+      body: JSON.stringify({
         reveal_stage: nextStage,
         community_cards: communityCards,
-      })
-      .eq('id', body.handId)
-      .select('id, reveal_stage, community_cards, all_community_cards')
-      .single();
+      }),
+    });
 
-    if (updateError) {
-      throw updateError;
+    if (!updateHandRes.ok) {
+      return sendJson(res, 500, { ok: false, error: await updateHandRes.text() });
     }
 
+    const updatedRows = (await updateHandRes.json()) as HandRow[];
+    const updatedHand = updatedRows[0];
+
     if (!updatedHand) {
-      throw new Error('Failed to update poker hand.');
+      return sendJson(res, 500, { ok: false, error: 'Failed to update poker hand.' });
     }
 
     return sendJson(res, 200, {
@@ -67,6 +122,7 @@ export default async function handler(req: any, res: any) {
       },
     });
   } catch (error) {
-    return handleApiError(res, error);
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    return sendJson(res, 500, { ok: false, error: message });
   }
 }
